@@ -1,0 +1,4 @@
+- name: Descargar datasets Infoleg
+  run: |
+    pip install pandas requests
+    python scripts/descargar_infoleg.py
