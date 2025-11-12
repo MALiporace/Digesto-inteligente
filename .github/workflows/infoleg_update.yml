@@ -1,13 +1,15 @@
 name: Actualizar Infoleg
 
 on:
-  workflow_dispatch:    # permite ejecutarlo manualmente
+  workflow_dispatch:
   schedule:
-    - cron: "0 12 * * *"  # se ejecuta automáticamente cada día a las 9:00 (hora Argentina, UTC-3)
+    - cron: "0 12 * * *"
 
 jobs:
   descargar:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write   # <<< esto habilita el push
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -17,6 +19,8 @@ jobs:
           pip install pandas requests
 
       - name: Ejecutar script de descarga
+        env:
+          DROPBOX_ACCESS_TOKEN: ${{ secrets.DROPBOX_ACCESS_TOKEN }}
         run: python scripts/descargar_infoleg.py
 
       - name: Subir datasets actualizados al repo
