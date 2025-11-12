@@ -1,0 +1,20 @@
+name: Actualizar Infoleg
+
+on:
+  workflow_dispatch:    # permite ejecutarlo manualmente
+  schedule:
+    - cron: "0 12 * * *"  # se ejecuta automáticamente cada día a las 9:00 (hora Argentina, UTC-3)
+
+jobs:
+  descargar:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Instalar dependencias
+        run: |
+          pip install pandas requests
+
+      - name: Ejecutar script de descarga
+        run: python scripts/descargar_infoleg.py
