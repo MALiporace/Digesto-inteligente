@@ -1,47 +1,56 @@
 import os
+import zipfile
+import io
 import requests
 import pandas as pd
 from datetime import datetime, timedelta, timezone
 
-# === Configuración general ===
+# === 1. Configuración general ===
 argentina_tz = timezone(timedelta(hours=-3))
 timestamp = datetime.now(argentina_tz).strftime("%Y-%m-%d %H:%M:%S")
 
-# Carpeta de destino
 DATA_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "data")
 os.makedirs(DATA_DIR, exist_ok=True)
 
-# URL base del catálogo CKAN
-url_ckan = "https://datos.gob.ar/api/3/action/package_search?q=infoleg"
+# === 2. URLs oficiales (ZIP) ===
+resources = {
+    "infoleg_normativa": "https://datos.jus.gob.ar/dataset/d9a963ea-8b1d-4ca3-9dd9-07a4773e8c23/resource/bf0ec116-ad4e-4572-a476-e57167a84403/download/base-infoleg-normativa-nacional.zip",
+    "infoleg_modificadas": "https://datos.jus.gob.ar/dataset/d9a963ea-8b1d-4ca3-9dd9-07a4773e8c23/resource/0c4fdafe-f4e8-4ac2-bc2e-acf50c27066d/download/base-complementaria-infoleg-normas-modificadas.zip",
+    "infoleg_modificatorias": "https://datos.jus.gob.ar/dataset/d9a963ea-8b1d-4ca3-9dd9-07a4773e8c23/resource/dea3c247-5a5d-408f-a224-39ae0f8eb371/download/base-complementaria-infoleg-normas-modificatorias.zip",
+}
 
-print(f"🔍 Consultando catálogo CKAN ({url_ckan}) ...")
-response = requests.get(url_ckan)
-response.raise_for_status()
-data = response.json()
-
-datasets = data["result"]["results"]
 total_descargados = 0
 
-for ds in datasets:
-    title = ds["title"]
-    if "Infoleg" not in title:
-        continue
+print("🔍 Iniciando descarga de datasets oficiales de Infoleg...\n")
 
-    print(f"\n📦 Dataset detectado: {title}")
-    for resource in ds["resources"]:
-        if resource["format"].lower() == "csv":
-            csv_url = resource["url"]
-            nombre = resource["name"].strip().replace(" ", "_").lower()
-            nombre_archivo = f"{nombre}.csv"
-            destino = os.path.join(DATA_DIR, nombre_archivo)
+for nombre, url in resources.items():
+    print(f"⬇️  Descargando {nombre} desde:\n   {url}")
 
-            print(f"⬇️  Descargando: {csv_url}")
-            try:
-                df = pd.read_csv(csv_url)
-                df.to_csv(destino, index=False)
-                total_descargados += len(df)
-                print(f"✅ Guardado en {destino} ({len(df):,} filas)")
-            except Exception as e:
-                print(f"⚠️ Error descargando {csv_url}: {e}")
+    try:
+        # Descargar el ZIP en memoria
+        r = requests.get(url)
+        r.raise_for_status()
+        z = zipfile.ZipFile(io.BytesIO(r.content))
 
-print(f"\n🧾 {timestamp} - Descarga completada. Total filas acumuladas: {total_descargados:,}")
+        # Buscar el CSV dentro del ZIP
+        csv_files = [f for f in z.namelist() if f.endswith(".csv")]
+        if not csv_files:
+            print(f"⚠️ No se encontró CSV dentro del ZIP de {nombre}")
+            continue
+
+        csv_name = csv_files[0]
+        print(f"📄 Extrayendo {csv_name}...")
+
+        with z.open(csv_name) as f:
+            df = pd.read_csv(f, low_memory=False)
+
+        destino = os.path.join(DATA_DIR, f"{nombre}.csv")
+        df.to_csv(destino, index=False)
+
+        total_descargados += len(df)
+        print(f"✅ Guardado en {destino} ({len(df):,} filas)\n")
+
+    except Exception as e:
+        print(f"⚠️ Error procesando {nombre}: {e}\n")
+
+print(f"🧾 {timestamp} - Descarga completada. Total filas acumuladas: {total_descargados:,}")
