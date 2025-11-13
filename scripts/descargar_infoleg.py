@@ -11,14 +11,15 @@ from datetime import datetime, timedelta, timezone
 argentina_tz = timezone(timedelta(hours=-3))
 timestamp = datetime.now(argentina_tz).strftime("%Y-%m-%d %H:%M:%S")
 
-# === 2. Credenciales Dropbox (vienen desde GitHub Secrets) ===
-DROPBOX_REFRESH_TOKEN = os.environ.get("DROPBOX_REFRESH_TOKEN")
-DROPBOX_CLIENT_ID = os.environ.get("DROPBOX_CLIENT_ID")
-DROPBOX_CLIENT_SECRET = os.environ.get("DROPBOX_CLIENT_SECRET")
+
+# === 2. Credenciales Dropbox (tus nombres de secrets) ===
+DROPBOX_CLIENT_ID = os.environ.get("APP_KEY")            # antes: DROPBOX_CLIENT_ID
+DROPBOX_CLIENT_SECRET = os.environ.get("APP_SECRET")     # antes: DROPBOX_CLIENT_SECRET
+DROPBOX_REFRESH_TOKEN = os.environ.get("REFRESH_TOKEN")  # antes: DROPBOX_REFRESH_TOKEN
 
 
 def obtener_access_token():
-    """Genera un nuevo access_token válido usando el refresh_token."""
+    """Genera un access_token nuevo usando TU refresh_token."""
     url = "https://api.dropbox.com/oauth2/token"
     data = {
         "grant_type": "refresh_token",
@@ -28,12 +29,11 @@ def obtener_access_token():
     }
     r = requests.post(url, data=data)
     r.raise_for_status()
-    token = r.json()["access_token"]
-    return token
+    return r.json()["access_token"]
 
 
 def subir_a_dropbox(ruta_local, ruta_remota):
-    """Sube un archivo a Dropbox con un access_token recién generado."""
+    """Sube un archivo a Dropbox renovando token automáticamente."""
     access_token = obtener_access_token()
 
     with open(ruta_local, "rb") as f:
@@ -50,9 +50,11 @@ def subir_a_dropbox(ruta_local, ruta_remota):
         })
     }
 
-    r = requests.post("https://content.dropboxapi.com/2/files/upload",
-                      headers=headers,
-                      data=data)
+    r = requests.post(
+        "https://content.dropboxapi.com/2/files/upload",
+        headers=headers,
+        data=data
+    )
 
     if r.status_code == 200:
         print(f"☁️  Subido correctamente a Dropbox: {ruta_remota}")
@@ -86,4 +88,30 @@ for nombre, url in resources.items():
 
         csv_files = [f for f in z.namelist() if f.endswith(".csv")]
         if not csv_files:
-            print(f"⚠️ No se encont
+            print(f"⚠️ No se encontró CSV dentro del ZIP de {nombre}")
+            continue
+
+        csv_name = csv_files[0]
+        print(f"📄 Extrayendo {csv_name}...")
+
+        with z.open(csv_name) as f:
+            df = pd.read_csv(f, low_memory=False)
+
+        destino = os.path.join(DATA_DIR, f"{nombre}.csv")
+        df.to_csv(destino, index=False)
+
+        total_descargados += len(df)
+        print(f"✅ Guardado en {destino} ({len(df):,} filas)\n")
+
+    except Exception as e:
+        print(f"⚠️ Error procesando {nombre}: {e}\n")
+
+
+# === 5. Subir a Dropbox ===
+for nombre in resources.keys():
+    archivo_local = os.path.join(DATA_DIR, f"{nombre}.csv")
+    archivo_remoto = f"/data/{nombre}.csv"
+    subir_a_dropbox(archivo_local, archivo_remoto)
+
+
+print(f"🧾 {timestamp} - Descarga completada. Total filas acumuladas: {total_descargados:,}")
