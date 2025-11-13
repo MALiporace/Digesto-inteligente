@@ -9,7 +9,7 @@ jobs:
   descargar:
     runs-on: ubuntu-latest
     permissions:
-      contents: write   # <<< esto habilita el push
+      contents: write
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -20,12 +20,10 @@ jobs:
 
       - name: Ejecutar script de descarga
         env:
-          DROPBOX_CLIENT_ID: ${{ secrets.DROPBOX_CLIENT_ID }}
-          DROPBOX_CLIENT_SECRET: ${{ secrets.DROPBOX_CLIENT_SECRET }}
-          DROPBOX_REFRESH_TOKEN: ${{ secrets.DROPBOX_REFRESH_TOKEN }}
+          APP_KEY: ${{ secrets.APP_KEY }}
+          APP_SECRET: ${{ secrets.APP_SECRET }}
+          REFRESH_TOKEN: ${{ secrets.REFRESH_TOKEN }}
         run: python scripts/descargar_infoleg.py
-
-
 
       - name: Subir datasets actualizados al repo
         run: |
