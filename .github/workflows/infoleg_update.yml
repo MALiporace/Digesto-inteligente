@@ -27,7 +27,8 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add data/*.csv
-          git commit -m "Actualización automática de datasets Infoleg" || echo "Sin cambios para commitear"
+          git add scripts/  # o cualquier otra carpeta pequeña
+          git commit -m "Actualización automática de script Infoleg" || echo "Sin cambios para commitear"
           git push
+
 
