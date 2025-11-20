@@ -1,0 +1,9 @@
+- name: Diagnóstico de token
+    env:
+      RT: ${{ secrets.REFRESH_TOKEN }}
+      CID: ${{ secrets.APP_KEY }}
+      CS: ${{ secrets.APP_SECRET }}
+    run: |
+      echo "Len Refresh Token: ${#RT}"
+      echo "Len Client ID: ${#CID}"
+      echo "Len Client Secret: ${#CS}"
