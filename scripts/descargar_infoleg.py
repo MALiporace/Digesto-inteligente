@@ -4,6 +4,7 @@ import io
 import requests
 import pandas as pd
 import json
+import chardet
 from datetime import datetime, timedelta, timezone
 
 
@@ -95,7 +96,10 @@ for nombre, url in resources.items():
         print(f"📄 Extrayendo {csv_name}...")
 
         with z.open(csv_name) as f:
-            df = pd.read_csv(f, low_memory=False)
+            raw = f.read()
+            enc = chardet.detect(raw)["encoding"] or "latin1"
+            df = pd.read_csv(io.BytesIO(raw), low_memory=False, encoding=enc)
+
 
         destino = os.path.join(DATA_DIR, f"{nombre}.csv")
         df.to_csv(destino, index=False)
