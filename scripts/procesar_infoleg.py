@@ -1,36 +1,59 @@
 import os
 import pandas as pd
 
-BASE_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "data")
+# ===============================================
+# 1. Selección automática de la carpeta "data"
+# ===============================================
 
-# === Función para normalizar fechas ===
+# A. Ruta de Dropbox local
+DROPBOX_DATA = os.path.join(
+    os.path.expanduser("~"),
+    "Dropbox",
+    "Aplicaciones",
+    "Digesto_Inteligente",
+    "data"
+)
+
+# B. Ruta del repo local o GitHub Actions
+GITHUB_DATA = os.path.join(
+    os.path.dirname(os.path.abspath(__file__)),
+    "..",
+    "data"
+)
+
+# Elegimos automáticamente la ruta que existe
+if os.path.exists(DROPBOX_DATA):
+    BASE_DIR = DROPBOX_DATA
+    print(f"📂 Usando carpeta de Dropbox:\n{BASE_DIR}\n")
+else:
+    BASE_DIR = os.path.abspath(GITHUB_DATA)
+    print(f"📂 Usando carpeta del repositorio:\n{BASE_DIR}\n")
+
+# ===============================================
+# Función para normalizar fechas
+# ===============================================
+
 def normalizar_fecha(serie):
     return pd.to_datetime(serie, errors="coerce").dt.strftime("%Y-%m-%d")
 
 print("🔍 Procesando Infoleg → Digesto…\n")
 
-# === 1. Cargar datasets crudos ===
-df_norm = pd.read_csv(
-    os.path.join(BASE_DIR, "infoleg_normativa.csv"),
-    low_memory=False,
-    encoding="latin1"
-)
+# ===============================================
+# 2. Cargar datasets crudos
+# ===============================================
 
-df_modif = pd.read_csv(
-    os.path.join(BASE_DIR, "infoleg_modificadas.csv"),
-    low_memory=False,
-    encoding="latin1"
-)
+df_norm = pd.read_csv(os.path.join(BASE_DIR, "infoleg_normativa.csv"), 
+                      low_memory=False, encoding="latin1")
 
-df_modifatorias = pd.read_csv(
-    os.path.join(BASE_DIR, "infoleg_modificatorias.csv"),
-    low_memory=False,
-    encoding="latin1"
-)
+df_modif = pd.read_csv(os.path.join(BASE_DIR, "infoleg_modificadas.csv"), 
+                       low_memory=False, encoding="latin1")
 
-# ================================
-# === 2. Maestro de Normas    ===
-# ================================
+df_modifatorias = pd.read_csv(os.path.join(BASE_DIR, "infoleg_modificatorias.csv"), 
+                              low_memory=False, encoding="latin1")
+
+# ===============================================
+# 3. Maestro de Normas
+# ===============================================
 
 print("📚 Generando digesto_normas.csv…")
 
@@ -43,52 +66,40 @@ df_digesto_normas = pd.DataFrame({
     "titulo_resumido": df_norm["titulo_resumido"],
     "titulo_sumario": df_norm["titulo_sumario"],
     "fecha_publicacion": normalizar_fecha(df_norm["fecha_boletin"]),
-    "estado": "",  # Infoleg no lo provee
+    "estado": "",
     "fuente": "Infoleg",
     "url_texto_original": df_norm["texto_original"],
     "url_texto_actualizado": df_norm["texto_actualizado"],
 })
 
-df_digesto_normas.to_csv(
-    os.path.join(BASE_DIR, "digesto_normas.csv"),
-    index=False,
-    encoding="utf-8"
-)
+df_digesto_normas.to_csv(os.path.join(BASE_DIR, "digesto_normas.csv"),
+                         index=False, encoding="utf-8")
 
-print("✅ digesto_normas.csv generado correctamente.\n")
+print("✅ digesto_normas.csv generado.\n")
 
-# ===================================
-# === 3. Relaciones normativas    ===
-# ===================================
+# ===============================================
+# 4. Relaciones
+# ===============================================
 
 print("🔗 Generando digesto_relaciones.csv…")
 
-# A. Normas que X modifica (infoleg_modificatorias)
 df_rel_modifica = pd.DataFrame({
-    "id_origen": df_modifatorias["id_norma_modificatoria"],   # X
-    "id_destino": df_modifatorias["id_norma_modificada"],     # Y
+    "id_origen": df_modifatorias["id_norma_modificatoria"],
+    "id_destino": df_modifatorias["id_norma_modificada"],
     "tipo_relacion": "modifica"
 })
 
-# B. Normas que modifican a X (infoleg_modificadas)
 df_rel_modificada_por = pd.DataFrame({
-    "id_origen": df_modif["id_norma_modificatoria"],          # Z
-    "id_destino": df_modif["id_norma_modificada"],            # X
+    "id_origen": df_modif["id_norma_modificatoria"],
+    "id_destino": df_modif["id_norma_modificada"],
     "tipo_relacion": "es_modificada_por"
 })
 
-# Unir ambas
-df_digesto_rel = pd.concat(
-    [df_rel_modifica, df_rel_modificada_por],
-    ignore_index=True
-)
+df_digesto_rel = pd.concat([df_rel_modifica, df_rel_modificada_por], ignore_index=True)
 
-df_digesto_rel.to_csv(
-    os.path.join(BASE_DIR, "digesto_relaciones.csv"),
-    index=False,
-    encoding="utf-8"
-)
+df_digesto_rel.to_csv(os.path.join(BASE_DIR, "digesto_relaciones.csv"),
+                      index=False, encoding="utf-8")
 
-print("✅ digesto_relaciones.csv generado correctamente.\n")
+print("✅ digesto_relaciones.csv generado.\n")
 
 print("🎉 Digesto procesado con éxito.")
