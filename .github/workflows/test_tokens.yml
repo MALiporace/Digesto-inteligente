@@ -18,14 +18,14 @@ jobs:
           echo "Len Client ID: ${#CID}"
           echo "Len Client Secret: ${#CS}"
           
--  name: Test secreto crudo
-  env:
-    CS: ${{ secrets.APP_SECRET }}
-  run: |
-    if [ -z "$CS" ]; then
-      echo "❌ APP_SECRET está vacío"
-    else
-      echo "✔ APP_SECRET NO está vacío"
-      printf 'Contenido analizado (hex): '
-      printf '%s' "$CS" | od -An -tx1
-    fi
+    name: Test secreto crudo
+    env:
+      CS: ${{ secrets.APP_SECRET }}
+      run: |
+        if [ -z "$CS" ]; then
+          echo "❌ APP_SECRET está vacío"
+        else
+          echo "✔ APP_SECRET NO está vacío"
+          printf 'Contenido analizado (hex): '
+          printf '%s' "$CS" | od -An -tx1
+        fi
