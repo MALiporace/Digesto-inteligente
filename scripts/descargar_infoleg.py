@@ -111,11 +111,36 @@ for nombre, url in resources.items():
         print(f"⚠️ Error procesando {nombre}: {e}\n")
 
 
-# === 5. Subir a Dropbox ===
+# === 5. Subir a Dropbox (con eliminación previa) ===
+
+def borrar_en_dropbox(path, token):
+    """Elimina el archivo remoto si existe antes de subir el nuevo."""
+    url = "https://api.dropboxapi.com/2/files/delete_v2"
+    headers = {
+        "Authorization": f"Bearer {token}",
+        "Content-Type": "application/json"
+    }
+    data = json.dumps({"path": path})
+    r = requests.post(url, headers=headers, data=data)
+
+    # 409 = file not found → no es error, se ignora
+    if r.status_code == 200:
+        print(f"🗑️ Eliminado en Dropbox: {path}")
+    elif r.status_code == 409:
+        print(f"ℹ️ No existía en Dropbox (bien): {path}")
+    else:
+        print(f"⚠️ Error eliminando {path}: {r.text}")
+
+
+# Generar token una sola vez
+access_token = obtener_access_token()
+
+# Subir archivos de /data
 for nombre in resources.keys():
     archivo_local = os.path.join(DATA_DIR, f"{nombre}.csv")
     archivo_remoto = f"/data/{nombre}.csv"
+
+    borrar_en_dropbox(archivo_remoto, access_token)
     subir_a_dropbox(archivo_local, archivo_remoto)
 
-
-print(f"🧾 {timestamp} - Descarga completada. Total filas acumuladas: {total_descargados:,}")
+print("☁️ Archivos /data actualizados en Dropbox.")
