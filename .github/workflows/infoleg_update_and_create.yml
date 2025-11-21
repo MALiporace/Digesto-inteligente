@@ -10,7 +10,7 @@ jobs:
     runs-on: ubuntu-latest
 
     permissions:
-      contents: write     # habilita git push si en algún momento lo necesitás
+      contents: write
 
     steps:
       - name: Checkout del repositorio
@@ -37,10 +37,9 @@ jobs:
         run: python scripts/procesar_infoleg.py
 
       # ============================================================
-      # 3) Subir a Dropbox: data/ y data_procesada/
+      # 3) BORRAR archivos viejos y SUBIR nuevos
       # ============================================================
-
-      - name: Subir archivos procesados a Dropbox
+      - name: Subir archivos a Dropbox
         env:
           DROPBOX_REFRESH_TOKEN: ${{ secrets.REFRESH_TOKEN }}
           DROPBOX_CLIENT_ID: ${{ secrets.APP_KEY }}
@@ -50,54 +49,76 @@ jobs:
           import os, json, requests
 
           # ---------------------------------------------------------
-          # Funciones utilitarias
+          # Genera nuevo access token
           # ---------------------------------------------------------
-
           def obtener_access_token():
               data = {
                   "grant_type": "refresh_token",
                   "refresh_token": os.environ["DROPBOX_REFRESH_TOKEN"],
                   "client_id": os.environ["DROPBOX_CLIENT_ID"],
-                  "client_secret": os.environ["DROPBOX_CLIENT_SECRET"]
+                  "client_secret": os.environ["DROPBOX_CLIENT_SECRET"],
               }
               r = requests.post("https://api.dropbox.com/oauth2/token", data=data)
               r.raise_for_status()
               return r.json()["access_token"]
 
-          def subir_archivo(local_path, remote_path, token):
-              with open(local_path, "rb") as f:
-                  data = f.read()
+          # ---------------------------------------------------------
+          # Borrar archivos en una carpeta remota
+          # ---------------------------------------------------------
+          def borrar_carpeta(token, carpeta):
+              url_list = "https://api.dropboxapi.com/2/files/list_folder"
+              url_del  = "https://api.dropboxapi.com/2/files/delete_v2"
+
+              headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
+
+              r = requests.post(url_list, headers=headers, json={"path": f"/{carpeta}"})
+              if r.status_code != 200:
+                  print(f"No se pudo listar /{carpeta}: {r.text}")
+                  return
+
+              for entry in r.json().get("entries", []):
+                  ruta = entry["path_lower"]
+                  print(f"🗑️  Borrando {ruta}")
+                  requests.post(url_del, headers=headers, json={"path": ruta})
+
+          # ---------------------------------------------------------
+          # Subir archivo
+          # ---------------------------------------------------------
+          def subir(token, local, remoto):
               headers = {
                   "Authorization": f"Bearer {token}",
                   "Content-Type": "application/octet-stream",
                   "Dropbox-API-Arg": json.dumps({
-                      "path": remote_path,
+                      "path": remoto,
                       "mode": "overwrite",
-                      "autorename": False,
-                      "mute": False
+                      "autorename": False
                   })
               }
+              with open(local, "rb") as f:
+                  data = f.read()
               r = requests.post("https://content.dropboxapi.com/2/files/upload",
                                 headers=headers, data=data)
-              print(f"{remote_path} → {r.status_code}")
+              print(f"⬆️  {remoto} → {r.status_code}")
 
           # ---------------------------------------------------------
-          # Subir todos los archivos de data/ y data_procesada/
+          # Ejecutar limpieza + subida
           # ---------------------------------------------------------
-
           token = obtener_access_token()
-
           carpetas = ["data", "data_procesada"]
 
-          for carpeta in carpetas:
-              local_dir = os.path.join(os.getcwd(), carpeta)
-              if not os.path.exists(local_dir):
+          # borrar TODO primero
+          for c in carpetas:
+              borrar_carpeta(token, c)
+
+          # volver a subir limpio
+          root = os.getcwd()
+          for c in carpetas:
+              ruta_local = os.path.join(root, c)
+              if not os.path.exists(ruta_local):
                   continue
-              for archivo in os.listdir(local_dir):
-                  ruta_local = os.path.join(local_dir, archivo)
-                  ruta_remota = f"/{carpeta}/{archivo}"
-                  subir_archivo(ruta_local, ruta_remota, token)
+              for archivo in os.listdir(ruta_local):
+                  local = os.path.join(ruta_local, archivo)
+                  remoto = f"/{c}/{archivo}"
+                  subir(token, local, remoto)
 
           EOF
-
-
