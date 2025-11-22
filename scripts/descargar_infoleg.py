@@ -127,21 +127,24 @@ for nombre, url in resources.items():
         csv_name = csv_files[0]
         print(f"📄 Extrayendo {csv_name}...")
 
-        # 1) LEER SIEMPRE COMO LATIN-1 (es el origen real del mojibake)
-        with z.open(csv_name) as f:
-            raw = f.read()
+with z.open(csv_name) as f:
+    raw = f.read()
 
-        texto = raw.decode("latin1", errors="ignore")
+# --- FIX DEFINITIVO DE DOBLE CODIFICACIÓN ---
+try:
+    # El CSV viene en UTF-8 → recodificado como Latin1 → guardado de nuevo como UTF-8
+    texto = (
+        raw.decode("utf-8", errors="ignore")      # intento de decodificar como utf8
+            .encode("latin1", errors="ignore")     # reinterpretar los bytes mal formados
+            .decode("utf-8", errors="ignore")      # decodificar correctamente
+    )
+except:
+    # fallback defensivo
+    texto = raw.decode("latin1", errors="replace")
+    
+# Cargar en pandas
+df = pd.read_csv(io.StringIO(texto), low_memory=False)
 
-        # 2) Reparar línea a línea
-        lineas = []
-        for linea in texto.splitlines():
-            lineas.append(arreglar_mojibake(linea))
-
-        texto_corregido = "\n".join(lineas)
-
-        # 3) Cargar en pandas
-        df = pd.read_csv(io.StringIO(texto_corregido), low_memory=False)
 
         destino = os.path.join(DATA_DIR, f"{nombre}.csv")
         df.to_csv(destino, index=False, encoding="utf-8")
