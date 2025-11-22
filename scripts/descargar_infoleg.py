@@ -91,7 +91,7 @@ def subir_a_dropbox(local_path, remote_path, token):
     print(f"{remote_path} → {r.status_code}")
 
 # ==========================================================
-# FIX DEFINITIVO DEL MOJIBAKE
+# DESCARGA + FIX REAL DEL BOM UTF-8
 # ==========================================================
 
 print("🔍 Iniciando descarga Infoleg...\n")
@@ -113,19 +113,22 @@ for nombre, url in resources.items():
         csv_name = csv_files[0]
         print(f"📄 Extrayendo {csv_name}...")
 
+        # --- Leer bytes crudos ---
+        with z.open(csv_name) as f:
+            raw = f.read()
+
+        # === FIX DEFINITIVO ===
+        # 1) remover BOM si existe
+        if raw.startswith(b'\xef\xbb\xbf'):
+            raw = raw[3:]
+
+        # 2) decodificar normalmente
         try:
-            with z.open(csv_name) as f:
-                raw = f.read()
-
-            texto = (
-                raw.decode("utf-8", errors="ignore")
-                    .encode("latin1", errors="ignore")
-                    .decode("utf-8", errors="ignore")
-            )
-
-        except Exception:
+            texto = raw.decode("utf-8")
+        except:
             texto = raw.decode("latin1", errors="replace")
 
+        # 3) cargar CSV
         df = pd.read_csv(io.StringIO(texto), low_memory=False)
 
         destino = os.path.join(DATA_DIR, f"{nombre}.csv")
@@ -137,7 +140,7 @@ for nombre, url in resources.items():
         print(f"❌ Error procesando {nombre}: {e}\n")
 
 # ==========================================================
-# Subir a Dropbox
+# Subir a Dropbox con eliminación previa
 # ==========================================================
 
 print("☁️ Subiendo a Dropbox...")
