@@ -95,27 +95,30 @@ for nombre, url in resources.items():
         csv_name = csv_files[0]
         print(f"📄 Extrayendo {csv_name}...")
 
-        # === LEER SIEMPRE COMO BYTES ===
+        # =============================
+        # LECTURA + FIX MOJIBAKE REAL
+        # =============================
         with z.open(csv_name) as f:
             raw = f.read()
 
-        # === FUNCIÓN PARA LIMPIAR MOJIBAKE ===
-        def limpiar_mojibake(texto):
-            return (texto.encode("latin1", errors="ignore")
-                         .decode("utf-8", errors="ignore"))
-
-        # === DECODIFICAR COMO WINDOWS-1252 ===
+        # 1) Windows-1252 → texto preliminar
         texto = raw.decode("windows-1252", errors="replace")
 
-        # === ARREGLAR MOJIBAKE ===
+        # 2) Limpieza de mojibake:
+        def limpiar_mojibake(t):
+            return (
+                t.encode("latin1", errors="ignore")
+                 .decode("utf-8", errors="ignore")
+            )
+
         texto = limpiar_mojibake(texto)
 
-        # === CARGAR EN PANDAS ===
+        # 3) Cargar en pandas desde StringIO
         df = pd.read_csv(io.StringIO(texto), low_memory=False)
 
-        # === GUARDAR ARCHIVO LIMPIO ===
+        # Guardar salida
         destino = os.path.join(DATA_DIR, f"{nombre}.csv")
-        df.to_csv(destino, index=False)
+        df.to_csv(destino, index=False, encoding="utf-8")
 
         total_descargados += len(df)
         print(f"✅ Guardado en {destino} ({len(df):,} filas)\n")
