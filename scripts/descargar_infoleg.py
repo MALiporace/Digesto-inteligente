@@ -94,35 +94,34 @@ for nombre, url in resources.items():
 
         csv_name = csv_files[0]
         print(f"📄 Extrayendo {csv_name}...")
-        
 
-# === leer el CSV SIEMPRE como bytes, no confiar en chardet ===
-with z.open(csv_name) as f:
-    raw = f.read()
+        # === LEER SIEMPRE COMO BYTES ===
+        with z.open(csv_name) as f:
+            raw = f.read()
 
-# --- función para corregir mojibake ---
-def limpiar_mojibake(texto):
-    """
-    Corrige 'Ã¡', 'Ã±', 'Ã³', etc.
-    """
-    return (texto.encode("latin1", errors="ignore")
-                 .decode("utf-8", errors="ignore"))
+        # === FUNCIÓN PARA LIMPIAR MOJIBAKE ===
+        def limpiar_mojibake(texto):
+            return (texto.encode("latin1", errors="ignore")
+                         .decode("utf-8", errors="ignore"))
 
-# --- decodificar como Windows-1252 (origen real del mojibake) ---
-texto = raw.decode("windows-1252", errors="replace")
+        # === DECODIFICAR COMO WINDOWS-1252 ===
+        texto = raw.decode("windows-1252", errors="replace")
 
-# --- limpiar mojibake ---
-texto = limpiar_mojibake(texto)
+        # === ARREGLAR MOJIBAKE ===
+        texto = limpiar_mojibake(texto)
 
-# --- cargar a pandas ---
-df = pd.read_csv(io.StringIO(texto), low_memory=False)
+        # === CARGAR EN PANDAS ===
+        df = pd.read_csv(io.StringIO(texto), low_memory=False)
 
-# --- guardar CSV ---
-destino = os.path.join(DATA_DIR, f"{nombre}.csv")
-df.to_csv(destino, index=False)
+        # === GUARDAR ARCHIVO LIMPIO ===
+        destino = os.path.join(DATA_DIR, f"{nombre}.csv")
+        df.to_csv(destino, index=False)
 
-total_descargados += len(df)
-print(f"✅ Guardado en {destino} ({len[df],} filas)\n")
+        total_descargados += len(df)
+        print(f"✅ Guardado en {destino} ({len(df):,} filas)\n")
+
+    except Exception as e:
+        print(f"⚠️ Error procesando {nombre}: {e}\n")
 
 
 # === 5. Subir a Dropbox (con eliminación previa) ===
