@@ -111,32 +111,32 @@ for nombre, url in resources.items():
             print(f"⚠️ No se encontró CSV en {nombre}")
             continue
 
-    csv_name = csv_files[0]
-    print(f"📄 Extrayendo {csv_name}...")
+        csv_name = csv_files[0]
+        print(f"📄 Extrayendo {csv_name}...")
     
-    try:
-        with z.open(csv_name) as f:
-            raw = f.read()
+        try:
+            with z.open(csv_name) as f:
+                raw = f.read()
     
-        # FIX DEFINITIVO
-        texto = (
-            raw.decode("utf-8", errors="ignore")
-                .encode("latin1", errors="ignore")
-                .decode("utf-8", errors="ignore")
-        )
+            # FIX DEFINITIVO
+            texto = (
+                raw.decode("utf-8", errors="ignore")
+                    .encode("latin1", errors="ignore")
+                    .decode("utf-8", errors="ignore")
+            )
     
-    except:
-        texto = raw.decode("latin1", errors="replace")
-    
-            df = pd.read_csv(io.StringIO(texto), low_memory=False)
-    
-            destino = os.path.join(DATA_DIR, f"{nombre}.csv")
-            df.to_csv(destino, index=False, encoding="utf-8")
-    
-            print(f"✅ Guardado: {destino} ({len(df):,} filas)\n")
-    
-        except Exception as e:
-            print(f"❌ Error procesando {nombre}: {e}\n")
+        except:
+            texto = raw.decode("latin1", errors="replace")
+        
+                df = pd.read_csv(io.StringIO(texto), low_memory=False)
+        
+                destino = os.path.join(DATA_DIR, f"{nombre}.csv")
+                df.to_csv(destino, index=False, encoding="utf-8")
+        
+                print(f"✅ Guardado: {destino} ({len(df):,} filas)\n")
+        
+            except Exception as e:
+                print(f"❌ Error procesando {nombre}: {e}\n")
 
 # ==========================================================
 # Subir a Dropbox con eliminación previa
