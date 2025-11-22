@@ -92,7 +92,7 @@ def subir_a_dropbox(local_path, remote_path, token):
 
 
 # ==========================================================
-# DESCARGA + DECODIFICACIÓN CORRECTA (UTF-8 DIRECTO)
+# Descarga + FIX de encoding
 # ==========================================================
 
 print("🔍 Iniciando descarga Infoleg...\n")
@@ -114,13 +114,23 @@ for nombre, url in resources.items():
         csv_name = csv_files[0]
         print(f"📄 Extrayendo {csv_name}...")
 
-        # LEER Y DECODIFICAR CORRECTAMENTE (UTF-8 NATIVO)
+        # Leemos el CSV crudo
         with z.open(csv_name) as f:
             raw = f.read()
 
-        # Infoleg publica en UTF-8 → decodificar directo
-        texto = raw.decode("utf-8", errors="replace")
+        # Caso 1: viene en UTF-8 con mojibake tipo "ResoluciÃ³n"
+        try:
+            texto_corrupto = raw.decode("utf-8")          # sin ignore, para no perder bytes
+            texto = (
+                texto_corrupto
+                    .encode("latin1")                     # reinterpretar como latin1
+                    .decode("utf-8")                      # y volver a utf-8 correcto
+            )
+        except UnicodeDecodeError:
+            # Caso 2: viene realmente en latin1 / cp1252
+            texto = raw.decode("latin1")
 
+        # Cargar en pandas desde el texto ya corregido
         df = pd.read_csv(io.StringIO(texto), low_memory=False)
 
         destino = os.path.join(DATA_DIR, f"{nombre}.csv")
@@ -130,7 +140,6 @@ for nombre, url in resources.items():
 
     except Exception as e:
         print(f"❌ Error procesando {nombre}: {e}\n")
-
 
 # ==========================================================
 # Subir a Dropbox con eliminación previa
@@ -148,6 +157,7 @@ for nombre in resources.keys():
     subir_a_dropbox(archivo_local, archivo_remoto, token)
 
 print("✔ Finalizado correctamente.")
+
 
 
 
