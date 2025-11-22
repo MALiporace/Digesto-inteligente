@@ -129,20 +129,30 @@ for nombre, url in resources.items():
         csv_name = csv_files[0]
         print(f"📄 Extrayendo {csv_name}...")
 
-        # leer bytes crudos
-        with z.open(csv_name) as f:
-            raw = f.read()
+# =============================
+# LECTURA + FIX MOJIBAKE REAL
+# =============================
+with z.open(csv_name) as f:
+    raw = f.read()
 
-        # detectar encoding real
-        det = chardet.detect(raw)
-        encoding_detectada = det["encoding"] or "latin1"
-        print(f"   → encoding detectado: {encoding_detectada}")
+# Detectar encoding real (aunque venga mal declarado)
+det = chardet.detect(raw)
+encoding_detectada = det["encoding"] or "latin1"
 
-        # decodificar solo una vez
-        texto = raw.decode(encoding_detectada, errors="replace")
+# 1) decodificar según lo detectado
+texto = raw.decode(encoding_detectada, errors="replace")
 
-        # cargar a pandas
-        df = pd.read_csv(io.StringIO(texto), low_memory=False)
+# 2) aplicar fix de mojibake si el texto tiene patrones “Ã”
+if "Ã" in texto or "Â" in texto:
+    try:
+        # re-intento de decodificación doble (UTF8 leído como latin1)
+        texto = texto.encode("latin1", errors="ignore").decode("utf8", errors="ignore")
+    except:
+        pass
+
+# 3) cargar finalmente en pandas
+df = pd.read_csv(io.StringIO(texto), low_memory=False)
+
 
         # guardar UTF-8 limpio
         destino = os.path.join(DATA_DIR, f"{nombre}.csv")
