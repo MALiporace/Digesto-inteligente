@@ -3,6 +3,7 @@
 import os
 import pandas as pd
 
+
 # ==================================================
 # Rutas fijas para entorno de GitHub Actions
 # ==================================================
@@ -19,7 +20,6 @@ BASE_PROCESADA = os.path.join(
     "data_procesada"
 )
 
-# Crear carpeta si no existe (GitHub la crea sobre la marcha)
 os.makedirs(BASE_PROCESADA, exist_ok=True)
 
 
@@ -33,27 +33,29 @@ def normalizar_fecha(serie):
 
 print("Procesando Infoleg...")
 
+
 # ==================================================
-# 1. Cargar datasets crudos
+# 1. Cargar datasets crudos (YA VIENEN EN UTF-8)
 # ==================================================
 
 df_norm = pd.read_csv(
     os.path.join(BASE_DIR, "infoleg_normativa.csv"),
     low_memory=False,
-    encoding="latin1"
+    encoding="utf-8"
 )
 
 df_modif = pd.read_csv(
     os.path.join(BASE_DIR, "infoleg_modificadas.csv"),
     low_memory=False,
-    encoding="latin1"
+    encoding="utf-8"
 )
 
 df_modifatorias = pd.read_csv(
     os.path.join(BASE_DIR, "infoleg_modificatorias.csv"),
     low_memory=False,
-    encoding="latin1"
+    encoding="utf-8"
 )
+
 
 # ==================================================
 # 2. Crear maestro de normas
@@ -84,23 +86,24 @@ df_digesto_normas.to_csv(
 
 print("digesto_normas.csv generado correctamente.")
 
+
 # ==================================================
 # 3. Crear tabla de relaciones
 # ==================================================
 
 print("Generando digesto_relaciones.csv...")
 
-# Caso A: X modifica a Y (infoleg_modificatorias)
+# A: “X modifica a Y”
 df_rel_modifica = pd.DataFrame({
     "id_origen": df_modifatorias["id_norma_modificatoria"],
     "id_destino": df_modifatorias["id_norma_modificada"],
     "tipo_relacion": "modifica"
 })
 
-# Caso B: X es modificada por Y (infoleg_modificadas)
+# B: “X es modificada por Y”
 df_rel_modificada_por = pd.DataFrame({
-    "id_origen": df_modif["id_norma_modificada"],        # X
-    "id_destino": df_modif["id_norma_modificatoria"],    # Y
+    "id_origen": df_modif["id_norma_modificada"],
+    "id_destino": df_modif["id_norma_modificatoria"],
     "tipo_relacion": "es_modificada_por"
 })
 
