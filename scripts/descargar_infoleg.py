@@ -97,8 +97,12 @@ for nombre, url in resources.items():
 
         with z.open(csv_name) as f:
             raw = f.read()
-            enc = chardet.detect(raw)["encoding"] or "latin1"
-            df = pd.read_csv(io.BytesIO(raw), low_memory=False, encoding=enc)
+        
+        try:
+            df = pd.read_csv(io.BytesIO(raw), low_memory=False, encoding="windows-1252")
+        except UnicodeDecodeError:
+            df = pd.read_csv(io.BytesIO(raw), low_memory=False, encoding="latin1")
+
 
 
         destino = os.path.join(DATA_DIR, f"{nombre}.csv")
