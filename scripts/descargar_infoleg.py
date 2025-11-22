@@ -91,16 +91,18 @@ def subir_a_dropbox(local_path, remote_path, token):
     print(f"{remote_path} → {r.status_code}")
 
 # ==========================================================
-# Fix mojibake
+# FIX REAL DEL MOJIBAKE DE INFOLEG
 # ==========================================================
 
 def arreglar_mojibake(texto):
-    if "Ã" in texto or "Â" in texto:
-        try:
-            texto = texto.encode("latin1", errors="ignore").decode("utf8", errors="ignore")
-        except:
-            pass
-    return texto
+    """
+    Fix estable para texto del tipo:
+    'ResoluciÃƒÂ³n' → 'Resolución'
+    """
+    try:
+        return texto.encode("latin1").decode("utf-8")
+    except:
+        return texto
 
 # ==========================================================
 # Descarga y extracción
@@ -125,24 +127,21 @@ for nombre, url in resources.items():
         csv_name = csv_files[0]
         print(f"📄 Extrayendo {csv_name}...")
 
-        # LECTURA DEL CSV COMO TEXTO
+        # 1) LEER SIEMPRE COMO LATIN-1 (es el origen real del mojibake)
         with z.open(csv_name) as f:
             raw = f.read()
 
-        # Detectamos encoding sin chardet
-        for enc in ["utf-8", "latin1", "windows-1252", "cp1252"]:
-            try:
-                texto = raw.decode(enc)
-                break
-            except:
-                texto = None
+        texto = raw.decode("latin1", errors="ignore")
 
-        if texto is None:
-            texto = raw.decode("latin1", errors="replace")
+        # 2) Reparar línea a línea
+        lineas = []
+        for linea in texto.splitlines():
+            lineas.append(arreglar_mojibake(linea))
 
-        texto = arreglar_mojibake(texto)
+        texto_corregido = "\n".join(lineas)
 
-        df = pd.read_csv(io.StringIO(texto), low_memory=False)
+        # 3) Cargar en pandas
+        df = pd.read_csv(io.StringIO(texto_corregido), low_memory=False)
 
         destino = os.path.join(DATA_DIR, f"{nombre}.csv")
         df.to_csv(destino, index=False, encoding="utf-8")
@@ -168,5 +167,6 @@ for nombre in resources.keys():
     subir_a_dropbox(archivo_local, archivo_remoto, token)
 
 print("✔ Finalizado correctamente.")
+
 
 
