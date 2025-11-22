@@ -91,22 +91,9 @@ def subir_a_dropbox(local_path, remote_path, token):
     print(f"{remote_path} → {r.status_code}")
 
 # ==========================================================
-# FIX REAL DEL MOJIBAKE DE INFOLEG
+# FIX DEFINITIVO DEL MOJIBAKE
 # ==========================================================
 
-def arreglar_mojibake(texto):
-    """
-    Fix estable para texto del tipo:
-    'ResoluciÃƒÂ³n' → 'Resolución'
-    """
-    try:
-        return texto.encode("latin1").decode("utf-8")
-    except:
-        return texto
-
-# ==========================================================
-# Descarga y extracción
-# ==========================================================
 
 print("🔍 Iniciando descarga Infoleg...\n")
 
@@ -127,24 +114,22 @@ for nombre, url in resources.items():
         csv_name = csv_files[0]
         print(f"📄 Extrayendo {csv_name}...")
 
-with z.open(csv_name) as f:
-    raw = f.read()
+        # ===========================
+        # BLOQUE DE FIX (indentado OK)
+        # ===========================
+        with z.open(csv_name) as f:
+            raw = f.read()
 
-# --- FIX DEFINITIVO DE DOBLE CODIFICACIÓN ---
-try:
-    # El CSV viene en UTF-8 → recodificado como Latin1 → guardado de nuevo como UTF-8
-    texto = (
-        raw.decode("utf-8", errors="ignore")      # intento de decodificar como utf8
-            .encode("latin1", errors="ignore")     # reinterpretar los bytes mal formados
-            .decode("utf-8", errors="ignore")      # decodificar correctamente
-    )
-except:
-    # fallback defensivo
-    texto = raw.decode("latin1", errors="replace")
-    
-# Cargar en pandas
-df = pd.read_csv(io.StringIO(texto), low_memory=False)
+        try:
+            texto = (
+                raw.decode("utf-8", errors="ignore")
+                    .encode("latin1", errors="ignore")
+                    .decode("utf-8", errors="ignore")
+            )
+        except:
+            texto = raw.decode("latin1", errors="replace")
 
+        df = pd.read_csv(io.StringIO(texto), low_memory=False)
 
         destino = os.path.join(DATA_DIR, f"{nombre}.csv")
         df.to_csv(destino, index=False, encoding="utf-8")
