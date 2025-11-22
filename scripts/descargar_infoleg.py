@@ -94,32 +94,35 @@ for nombre, url in resources.items():
 
         csv_name = csv_files[0]
         print(f"📄 Extrayendo {csv_name}...")
-
-        with z.open(csv_name) as f:
-            raw = f.read()
         
-            # Detectar la codificación original
-            detected = chardet.detect(raw)
-            original_encoding = detected["encoding"] or "latin1"
-        
-            # Convertir SIEMPRE a UTF-8 bien formado
-            text = raw.decode(original_encoding, errors="replace")
-            utf8_bytes = text.encode("utf-8")
-        
-            # Leer el CSV ya estandarizado
-            df = pd.read_csv(io.BytesIO(utf8_bytes), low_memory=False)
 
+# === leer el CSV SIEMPRE como bytes, no confiar en chardet ===
+with z.open(csv_name) as f:
+    raw = f.read()
 
+# --- función para corregir mojibake ---
+def limpiar_mojibake(texto):
+    """
+    Corrige 'Ã¡', 'Ã±', 'Ã³', etc.
+    """
+    return (texto.encode("latin1", errors="ignore")
+                 .decode("utf-8", errors="ignore"))
 
+# --- decodificar como Windows-1252 (origen real del mojibake) ---
+texto = raw.decode("windows-1252", errors="replace")
 
-        destino = os.path.join(DATA_DIR, f"{nombre}.csv")
-        df.to_csv(destino, index=False)
+# --- limpiar mojibake ---
+texto = limpiar_mojibake(texto)
 
-        total_descargados += len(df)
-        print(f"✅ Guardado en {destino} ({len(df):,} filas)\n")
+# --- cargar a pandas ---
+df = pd.read_csv(io.StringIO(texto), low_memory=False)
 
-    except Exception as e:
-        print(f"⚠️ Error procesando {nombre}: {e}\n")
+# --- guardar CSV ---
+destino = os.path.join(DATA_DIR, f"{nombre}.csv")
+df.to_csv(destino, index=False)
+
+total_descargados += len(df)
+print(f"✅ Guardado en {destino} ({len[df],} filas)\n")
 
 
 # === 5. Subir a Dropbox (con eliminación previa) ===
