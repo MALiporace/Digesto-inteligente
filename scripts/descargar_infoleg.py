@@ -98,10 +98,17 @@ for nombre, url in resources.items():
         with z.open(csv_name) as f:
             raw = f.read()
         
-        try:
-            df = pd.read_csv(io.BytesIO(raw), low_memory=False, encoding="windows-1252")
-        except UnicodeDecodeError:
-            df = pd.read_csv(io.BytesIO(raw), low_memory=False, encoding="latin1")
+            # Detectar la codificación original
+            detected = chardet.detect(raw)
+            original_encoding = detected["encoding"] or "latin1"
+        
+            # Convertir SIEMPRE a UTF-8 bien formado
+            text = raw.decode(original_encoding, errors="replace")
+            utf8_bytes = text.encode("utf-8")
+        
+            # Leer el CSV ya estandarizado
+            df = pd.read_csv(io.BytesIO(utf8_bytes), low_memory=False)
+
 
 
 
