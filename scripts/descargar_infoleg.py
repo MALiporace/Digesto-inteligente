@@ -111,23 +111,22 @@ for nombre, url in resources.items():
             print(f"⚠️ No se encontró CSV en {nombre}")
             continue
 
-        csv_name = csv_files[0]
-        print(f"📄 Extrayendo {csv_name}...")
+csv_name = csv_files[0]
+print(f"📄 Extrayendo {csv_name}...")
 
-        # ===========================
-        # BLOQUE DE FIX (indentado OK)
-        # ===========================
-        with z.open(csv_name) as f:
-            raw = f.read()
+try:
+    with z.open(csv_name) as f:
+        raw = f.read()
 
-        try:
-            texto = (
-                raw.decode("utf-8", errors="ignore")
-                    .encode("latin1", errors="ignore")
-                    .decode("utf-8", errors="ignore")
-            )
-        except:
-            texto = raw.decode("latin1", errors="replace")
+    # FIX DEFINITIVO
+    texto = (
+        raw.decode("utf-8", errors="ignore")
+            .encode("latin1", errors="ignore")
+            .decode("utf-8", errors="ignore")
+    )
+
+except:
+    texto = raw.decode("latin1", errors="replace")
 
         df = pd.read_csv(io.StringIO(texto), low_memory=False)
 
