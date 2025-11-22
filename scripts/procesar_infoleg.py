@@ -31,8 +31,7 @@ def normalizar_fecha(serie):
 
 def fix_mojibake_col(serie):
     """
-    Segunda línea de defensa: si todavía quedó algo tipo 'ResoluciÃ³n',
-    lo repara a nivel columna.
+    Repara textos estilo 'ResoluciÃ³n'.
     """
     def _fix(x):
         if not isinstance(x, str):
@@ -47,33 +46,38 @@ def fix_mojibake_col(serie):
     return serie.astype("string").apply(_fix)
 
 
+def leer_csv_utf8_fuerte(path):
+    """
+    Replica la lógica de Power BI:
+    - Intenta UTF-8 normal
+    - Si falla o se ve roto, intenta UTF-8 con BOM
+    - Limpia mojibake residual
+    """
+    try:
+        df = pd.read_csv(path, encoding="utf-8", low_memory=False)
+    except Exception:
+        df = pd.read_csv(path, encoding="utf-8-sig", low_memory=False)
+
+    # Limpieza defensiva sobre TODAS las columnas tipo texto
+    for col in df.columns:
+        if df[col].dtype == "object":
+            df[col] = fix_mojibake_col(df[col])
+
+    return df
+
+
 print("Procesando Infoleg...")
 
 # ==================================================
-# 1. Cargar datasets crudos (YA en UTF-8)
-#    OJO: antes los leías como latin1 → eso rompía todo otra vez
+# 1. Cargar datasets crudos con lectura 'tipo Power BI'
 # ==================================================
 
-df_norm = pd.read_csv(
-    os.path.join(BASE_DIR, "infoleg_normativa.csv"),
-    low_memory=False,
-    encoding="utf-8"
-)
-
-df_modif = pd.read_csv(
-    os.path.join(BASE_DIR, "infoleg_modificadas.csv"),
-    low_memory=False,
-    encoding="utf-8"
-)
-
-df_modifatorias = pd.read_csv(
-    os.path.join(BASE_DIR, "infoleg_modificatorias.csv"),
-    low_memory=False,
-    encoding="utf-8"
-)
+df_norm = leer_csv_utf8_fuerte(os.path.join(BASE_DIR, "infoleg_normativa.csv"))
+df_modif = leer_csv_utf8_fuerte(os.path.join(BASE_DIR, "infoleg_modificadas.csv"))
+df_modifatorias = leer_csv_utf8_fuerte(os.path.join(BASE_DIR, "infoleg_modificatorias.csv"))
 
 # ==================================================
-# 1.b) Limpieza de mojibake residual en columnas de texto
+# 1.b) Limpieza de mojibake adicional (solo por si algo quedó suelto)
 # ==================================================
 
 cols_texto_norm = [
@@ -86,9 +90,6 @@ cols_texto_norm = [
 for c in cols_texto_norm:
     if c in df_norm.columns:
         df_norm[c] = fix_mojibake_col(df_norm[c])
-
-# (en las tablas de modificadas / modificatorias sólo usamos IDs,
-# así que no hace falta tocar sus textos para el digesto)
 
 # ==================================================
 # 2. Crear maestro de normas
@@ -125,17 +126,17 @@ print("digesto_normas.csv generado correctamente.")
 
 print("Generando digesto_relaciones.csv...")
 
-# Caso A: X modifica a Y (infoleg_modificatorias)
+# Caso A: X modifica a Y
 df_rel_modifica = pd.DataFrame({
     "id_origen": df_modifatorias["id_norma_modificatoria"],
     "id_destino": df_modifatorias["id_norma_modificada"],
     "tipo_relacion": "modifica"
 })
 
-# Caso B: X es modificada por Y (infoleg_modificadas)
+# Caso B: X es modificada por Y
 df_rel_modificada_por = pd.DataFrame({
-    "id_origen": df_modif["id_norma_modificada"],        # X
-    "id_destino": df_modif["id_norma_modificatoria"],    # Y
+    "id_origen": df_modif["id_norma_modificada"],
+    "id_destino": df_modif["id_norma_modificatoria"],
     "tipo_relacion": "es_modificada_por"
 })
 
@@ -152,4 +153,5 @@ df_digesto_rel.to_csv(
 
 print("digesto_relaciones.csv generado correctamente.")
 print("Digesto listo.")
+
 
