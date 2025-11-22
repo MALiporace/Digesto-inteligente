@@ -85,13 +85,36 @@ def subir_a_dropbox(local_path, remote_path, token):
         })
     }
 
-    r = requests.post("https://content.dropboxapi.com/2/files/upload",
-                      headers=headers, data=data)
+    r = requests.post(
+        "https://content.dropboxapi.com/2/files/upload",
+        headers=headers,
+        data=data
+    )
 
     print(f"{remote_path} → {r.status_code}")
 
+
 # ==========================================================
-# DESCARGA + FIX REAL DEL BOM UTF-8
+# FIX DEFINITIVO DEL MOJIBAKE
+# ==========================================================
+
+MOJIBAKE_MAP = {
+    "Ã¡": "á", "Ã©": "é", "Ã­": "í", "Ã³": "ó", "Ãº": "ú",
+    "Ã±": "ñ", "Ã": "Á", "Ã‰": "É", "Ã": "Í", "Ã“": "Ó",
+    "Ãš": "Ú", "Ã‘": "Ñ", "Â°": "°", "Âº": "º", "Âª": "ª",
+    "â€“": "–", "â€”": "—", "â€œ": "“", "â€": "”",
+    "â€˜": "‘", "â€™": "’", "â€¢": "•", "â€¦": "…",
+    "Ãœ": "Ü", "Ã¼": "ü"
+}
+
+def limpiar_mojibake(texto):
+    for malo, bueno in MOJIBAKE_MAP.items():
+        texto = texto.replace(malo, bueno)
+    return texto
+
+
+# ==========================================================
+# Descarga y extracción
 # ==========================================================
 
 print("🔍 Iniciando descarga Infoleg...\n")
@@ -113,23 +136,29 @@ for nombre, url in resources.items():
         csv_name = csv_files[0]
         print(f"📄 Extrayendo {csv_name}...")
 
-        # --- Leer bytes crudos ---
+        # === LECTURA BRUTA DEL CSV ===
         with z.open(csv_name) as f:
             raw = f.read()
 
-        # === FIX DEFINITIVO ===
-        # 1) remover BOM si existe
-        if raw.startswith(b'\xef\xbb\xbf'):
-            raw = raw[3:]
+        # === intentar decodificaciones ===
+        texto = None
+        for enc in ["utf-8", "latin1", "cp1252"]:
+            try:
+                texto = raw.decode(enc)
+                break
+            except:
+                texto = None
 
-        # 2) decodificar normalmente
-        try:
-            texto = raw.decode("utf-8")
-        except:
+        if texto is None:
             texto = raw.decode("latin1", errors="replace")
 
-        # 3) cargar CSV
-        df = pd.read_csv(io.StringIO(texto), low_memory=False)
+        # === limpiar línea por línea ===
+        lineas = texto.splitlines()
+        lineas_limpias = [limpiar_mojibake(l) for l in lineas]
+        texto_limpio = "\n".join(lineas_limpias)
+
+        # === cargar en pandas ===
+        df = pd.read_csv(io.StringIO(texto_limpio), low_memory=False)
 
         destino = os.path.join(DATA_DIR, f"{nombre}.csv")
         df.to_csv(destino, index=False, encoding="utf-8")
@@ -138,6 +167,7 @@ for nombre, url in resources.items():
 
     except Exception as e:
         print(f"❌ Error procesando {nombre}: {e}\n")
+
 
 # ==========================================================
 # Subir a Dropbox con eliminación previa
@@ -155,7 +185,6 @@ for nombre in resources.keys():
     subir_a_dropbox(archivo_local, archivo_remoto, token)
 
 print("✔ Finalizado correctamente.")
-
 
 
 
