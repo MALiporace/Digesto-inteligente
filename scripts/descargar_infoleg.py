@@ -100,20 +100,15 @@ for nombre, url in resources.items():
         # =============================
         with z.open(csv_name) as f:
             raw = f.read()
-
-        # 1) Windows-1252 → texto preliminar
-        texto = raw.decode("windows-1252", errors="replace")
-
-        # 2) Limpieza de mojibake:
-        def limpiar_mojibake(t):
-            return (
-                t.encode("latin1", errors="ignore")
-                 .decode("utf-8", errors="ignore")
-            )
-
-        texto = limpiar_mojibake(texto)
-
-        # 3) Cargar en pandas desde StringIO
+        
+        # detectar encoding real
+        det = chardet.detect(raw)
+        encoding_detectada = det["encoding"] or "latin1"
+        
+        # decodificar UNA sola vez
+        texto = raw.decode(encoding_detectada, errors="replace")
+        
+        # cargar a pandas
         df = pd.read_csv(io.StringIO(texto), low_memory=False)
 
         # Guardar salida
