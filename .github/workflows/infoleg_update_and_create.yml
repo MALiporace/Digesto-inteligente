@@ -18,7 +18,8 @@ jobs:
 
       - name: Instalar dependencias
         run: |
-          pip install pandas requests
+          pip install -r requirements.txt
+
 
       # ============================================================
       # 1) Descargar Infoleg (datos crudos → /data/)
