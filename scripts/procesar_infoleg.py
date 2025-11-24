@@ -201,6 +201,39 @@ df_digesto_normas.to_csv(
     encoding="utf-8-sig"
 )
 
+
+#  URL ALTERNATIVA - Paea cuando no existe texto_original
+
+def reconstruir_url_infoleg(id_norma):
+    """
+    Genera la URL dinámica a la ficha Infoleg,
+    usada cuando no existe texto_original real.
+    """
+    return f"https://servicios.infoleg.gob.ar/infolegInternet/verNorma.do?id={id_norma}"
+
+# Normalizar valores vacíos como NA
+df_digesto_normas["url_texto_original"] = (
+    df_digesto_normas["url_texto_original"]
+    .astype("string")
+    .replace({"": pd.NA})
+)
+
+# Crear campo alternativo siempre presente
+df_digesto_normas["texto_original_alternativo"] = (
+    df_digesto_normas["id_norma"].apply(reconstruir_url_infoleg)
+)
+
+# Cuando NO existe texto_original → usar el alternativo como principal
+mask_sin_texto = df_digesto_normas["url_texto_original"].isna()
+
+df_digesto_normas.loc[mask_sin_texto, "url_texto_original"] = (
+    df_digesto_normas.loc[mask_sin_texto, "texto_original_alternativo"]
+)
+
+# Campo para scraper bajo demanda
+df_digesto_normas["resumen_infoleg"] = pd.NA
+
+
 print("digesto_normas.csv generado correctamente.")
 
 # ==================================================
