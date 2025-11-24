@@ -4,7 +4,7 @@ import os
 import pandas as pd
 
 # ==================================================
-# Rutas fijas para entorno de GitHub Actions
+# Rutas fijas (GitHub Actions)
 # ==================================================
 
 BASE_DIR = os.path.join(
@@ -22,7 +22,7 @@ BASE_PROCESADA = os.path.join(
 os.makedirs(BASE_PROCESADA, exist_ok=True)
 
 # ==================================================
-# Helpers generales
+# Helpers
 # ==================================================
 
 def normalizar_fecha(serie):
@@ -30,18 +30,10 @@ def normalizar_fecha(serie):
 
 
 def reparar_mojibake_texto(x: str) -> str:
-    """
-    Repara mojibake típico de Infoleg:
-    - ResoluciÃ³n -> Resolución
-    - PequeÃ±a    -> Pequeña
-    - nÂº         -> nº
-    """
     if not isinstance(x, str):
         return x
-
     if "Ã" not in x and "Â" not in x and "Ð" not in x:
         return x
-
     try:
         return x.encode("latin1").decode("utf-8")
     except Exception:
@@ -49,53 +41,36 @@ def reparar_mojibake_texto(x: str) -> str:
 
 
 def reparar_mojibake_df(df: pd.DataFrame) -> pd.DataFrame:
-    """
-    Aplica la reparación de mojibake a todas las celdas string del DF.
-    """
     return df.applymap(reparar_mojibake_texto)
 
 
 def leer_csv_reforzado(path: str) -> pd.DataFrame:
-    """
-    Lector robusto para los CSV de Infoleg:
-    - prueba utf-8
-    - prueba utf-8-sig si hace falta
-    - repara mojibake a nivel DF
-    """
     try:
         df = pd.read_csv(path, encoding="utf-8", low_memory=False)
     except Exception:
         df = pd.read_csv(path, encoding="utf-8-sig", low_memory=False)
-
     df = reparar_mojibake_df(df)
     return df
 
-
 # ==================================================
-# Reconstrucción de URL alternativa para normas sin texto completo
+# URL dinámica SIEMPRE disponible
 # ==================================================
 
 def reconstruir_url_infoleg(id_norma):
-    """
-    Genera la URL dinámica a la ficha Infoleg,
-    usada cuando no existe texto_original real.
-    """
     return f"https://servicios.infoleg.gob.ar/infolegInternet/verNorma.do?id={id_norma}"
 
-
 # ==================================================
-# Procesamiento principal
+# Procesamiento
 # ==================================================
 
 print("Procesando Infoleg...")
 
-# 1) Cargar datasets crudos
 df_norm = leer_csv_reforzado(os.path.join(BASE_DIR, "infoleg_normativa.csv"))
 df_modif = leer_csv_reforzado(os.path.join(BASE_DIR, "infoleg_modificadas.csv"))
 df_modifatorias = leer_csv_reforzado(os.path.join(BASE_DIR, "infoleg_modificatorias.csv"))
 
 # ==================================================
-# 2. Crear maestro de normas (digesto_normas)
+# Crear digesto_normas
 # ==================================================
 
 print("Generando digesto_normas.csv...")
@@ -115,35 +90,49 @@ df_digesto_normas = pd.DataFrame({
     "url_texto_actualizado": df_norm["texto_actualizado"],
 })
 
-# Reparación final de mojibake
 df_digesto_normas = reparar_mojibake_df(df_digesto_normas)
 
-# ======================================================================
-# 2.b NORMALIZACIÓN: texto_original + texto_original_alternativo
-# ======================================================================
+# --------------------------------------------------
+# Normalización AGRESIVA de valores vacíos
+# --------------------------------------------------
 
-# Normalizar valores vacíos como NA
+def limpiar_url(x):
+    if not isinstance(x, str):
+        return pd.NA
+    xs = x.strip()
+    if xs in ("", "nan", "None", "0"):
+        return pd.NA
+    return xs
+
 df_digesto_normas["url_texto_original"] = (
     df_digesto_normas["url_texto_original"]
     .astype("string")
-    .replace({"": pd.NA})
+    .apply(limpiar_url)
 )
 
-# Crear campo alternativo SIEMPRE
+# --------------------------------------------------
+# Campo alternativo SIEMPRE presente
+# --------------------------------------------------
+
 df_digesto_normas["texto_original_alternativo"] = (
     df_digesto_normas["id_norma"].apply(reconstruir_url_infoleg)
 )
 
-# Si falta texto_original real, usar la alternativa
-mask_sin_texto = df_digesto_normas["url_texto_original"].isna()
-df_digesto_normas.loc[mask_sin_texto, "url_texto_original"] = (
-    df_digesto_normas.loc[mask_sin_texto, "texto_original_alternativo"]
-)
+# --------------------------------------------------
+# NO completar url_texto_original con alternativa
+# (queda NA si no hay texto real)
+# --------------------------------------------------
 
-# Campo para scraping bajo demanda
+# --------------------------------------------------
+# Campo resumen_infoleg vacío (bajo demanda)
+# --------------------------------------------------
+
 df_digesto_normas["resumen_infoleg"] = pd.NA
 
+# --------------------------------------------------
 # Guardar archivo maestro
+# --------------------------------------------------
+
 df_digesto_normas.to_csv(
     os.path.join(BASE_PROCESADA, "digesto_normas.csv"),
     index=False,
@@ -153,7 +142,7 @@ df_digesto_normas.to_csv(
 print("digesto_normas.csv generado correctamente.")
 
 # ==================================================
-# 3. Crear tabla de relaciones (digesto_relaciones)
+# Relaciones
 # ==================================================
 
 print("Generando digesto_relaciones.csv...")
@@ -185,7 +174,6 @@ df_digesto_rel.to_csv(
 
 print("digesto_relaciones.csv generado correctamente.")
 print("Digesto listo.")
-
 
 
 
