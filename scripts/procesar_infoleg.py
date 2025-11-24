@@ -1,10 +1,11 @@
 # -*- coding: utf-8 -*-
 
 import os
+import csv
 import pandas as pd
 
 # ==================================================
-# Rutas para GitHub Actions
+# Paths (GitHub Actions)
 # ==================================================
 
 BASE_DIR = os.path.join(
@@ -47,7 +48,7 @@ def reparar_mojibake_df(df: pd.DataFrame) -> pd.DataFrame:
 def leer_csv_reforzado(path: str) -> pd.DataFrame:
     try:
         df = pd.read_csv(path, encoding="utf-8", low_memory=False)
-    except:
+    except Exception:
         df = pd.read_csv(path, encoding="utf-8-sig", low_memory=False)
 
     df = reparar_mojibake_df(df)
@@ -55,7 +56,7 @@ def leer_csv_reforzado(path: str) -> pd.DataFrame:
 
 
 # ==================================================
-# URL alternativa (siempre válida)
+# URL alternativa SIEMPRE presente
 # ==================================================
 
 def reconstruir_url_infoleg(id_norma):
@@ -63,7 +64,7 @@ def reconstruir_url_infoleg(id_norma):
 
 
 # ==================================================
-# Procesamiento principal
+# Procesamiento
 # ==================================================
 
 print("Procesando Infoleg...")
@@ -97,14 +98,10 @@ df_digesto_normas = reparar_mojibake_df(df_digesto_normas)
 
 # ==================================================
 # Normalización REAL de url_texto_original
-# (corrige los falsos vacíos detectados en las 42 normas)
+# (resuelve falsos vacíos y variantes invisibles)
 # ==================================================
 
 def limpiar_url(x):
-    """
-    Detecta vacíos reales, vacíos invisibles, espacios no separables,
-    'nan', 'None', '0', mojibake vacío.
-    """
     if x is None:
         return pd.NA
     if not isinstance(x, str):
@@ -114,7 +111,7 @@ def limpiar_url(x):
     if xs in ("", "nan", "None", "0"):
         return pd.NA
 
-    return xs  # valor válido
+    return xs
 
 df_digesto_normas["url_texto_original"] = (
     df_digesto_normas["url_texto_original"]
@@ -123,35 +120,35 @@ df_digesto_normas["url_texto_original"] = (
 )
 
 # ==================================================
-# Generar SIEMPRE texto_original_alternativo
+# Generar la URL alternativa SIEMPRE
 # ==================================================
 
 df_digesto_normas["texto_original_alternativo"] = (
     df_digesto_normas["id_norma"].apply(reconstruir_url_infoleg)
 )
 
-# ==================================================
-# NO tocar url_texto_original:
-#   - Si Infoleg dio texto: queda
-#   - Si no: queda NA (y se usará el alternativo)
-# ==================================================
+# NO rellenar url_texto_original
+# (si Infoleg no tiene texto real → queda NA a propósito)
 
+# Campo vacío para scraping bajo demanda
 df_digesto_normas["resumen_infoleg"] = pd.NA
 
 # ==================================================
-# Guardar archivo final
+# Guardar digesto_normas.csv con QUOTE_ALL
+# (soluciona truncados y "faltantes fantasma" en Excel)
 # ==================================================
 
 df_digesto_normas.to_csv(
     os.path.join(BASE_PROCESADA, "digesto_normas.csv"),
     index=False,
-    encoding="utf-8-sig"
+    encoding="utf-8-sig",
+    quoting=csv.QUOTE_ALL
 )
 
 print("digesto_normas.csv generado correctamente.")
 
 # ==================================================
-# Tabla de relaciones
+# Crear digesto_relaciones
 # ==================================================
 
 print("Generando digesto_relaciones.csv...")
@@ -178,11 +175,9 @@ df_digesto_rel = reparar_mojibake_df(df_digesto_rel)
 df_digesto_rel.to_csv(
     os.path.join(BASE_PROCESADA, "digesto_relaciones.csv"),
     index=False,
-    encoding="utf-8-sig"
+    encoding="utf-8-sig",
+    quoting=csv.QUOTE_ALL
 )
 
 print("digesto_relaciones.csv generado correctamente.")
 print("Digesto listo.")
-
-
-
