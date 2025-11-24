@@ -5,7 +5,7 @@ import csv
 import pandas as pd
 
 # ==================================================
-# Paths (GitHub Actions)
+# Paths
 # ==================================================
 
 BASE_DIR = os.path.join(
@@ -30,7 +30,7 @@ def normalizar_fecha(serie):
     return pd.to_datetime(serie, errors="coerce").dt.strftime("%Y-%m-%d")
 
 
-def reparar_mojibake_texto(x: str) -> str:
+def reparar_mojibake_texto(x):
     if not isinstance(x, str):
         return x
     if "Ã" not in x and "Â" not in x and "Ð" not in x:
@@ -41,27 +41,23 @@ def reparar_mojibake_texto(x: str) -> str:
         return x
 
 
-def reparar_mojibake_df(df: pd.DataFrame) -> pd.DataFrame:
+def reparar_mojibake_df(df):
     return df.applymap(reparar_mojibake_texto)
 
 
-def leer_csv_reforzado(path: str) -> pd.DataFrame:
+def leer_csv_reforzado(path):
     try:
         df = pd.read_csv(path, encoding="utf-8", low_memory=False)
-    except Exception:
+    except:
         df = pd.read_csv(path, encoding="utf-8-sig", low_memory=False)
-
-    df = reparar_mojibake_df(df)
-    return df
-
+    return reparar_mojibake_df(df)
 
 # ==================================================
-# URL alternativa SIEMPRE presente
+# URL dinámica
 # ==================================================
 
 def reconstruir_url_infoleg(id_norma):
     return f"https://servicios.infoleg.gob.ar/infolegInternet/verNorma.do?id={id_norma}"
-
 
 # ==================================================
 # Procesamiento
@@ -76,8 +72,6 @@ df_modifatorias = leer_csv_reforzado(os.path.join(BASE_DIR, "infoleg_modificator
 # ==================================================
 # Crear digesto_normas
 # ==================================================
-
-print("Generando digesto_normas.csv...")
 
 df_digesto_normas = pd.DataFrame({
     "id_norma": df_norm["id_norma"],
@@ -97,20 +91,28 @@ df_digesto_normas = pd.DataFrame({
 df_digesto_normas = reparar_mojibake_df(df_digesto_normas)
 
 # ==================================================
-# Normalización REAL de url_texto_original
-# (resuelve falsos vacíos y variantes invisibles)
+# NORMALIZACIÓN DE id_norma (CLAVE)
+# ==================================================
+# Elimina ".0", convierte todo a string, quita espacios, elimina NaN
+
+df_digesto_normas["id_norma"] = (
+    df_digesto_normas["id_norma"]
+    .astype(str)                     # convierte 594.0 → "594.0"
+    .str.replace(r"\.0$", "", regex=True)   # elimina ".0"
+    .str.strip()                     # quita espacios invisibles
+    .replace({"nan": pd.NA})         # convierte "nan" real a NA
+)
+
+# ==================================================
+# Normalizar url_texto_original
 # ==================================================
 
 def limpiar_url(x):
-    if x is None:
-        return pd.NA
     if not isinstance(x, str):
         return pd.NA
-
     xs = x.strip()
     if xs in ("", "nan", "None", "0"):
         return pd.NA
-
     return xs
 
 df_digesto_normas["url_texto_original"] = (
@@ -120,22 +122,18 @@ df_digesto_normas["url_texto_original"] = (
 )
 
 # ==================================================
-# Generar la URL alternativa SIEMPRE
+# Construir SIEMPRE la alternativa
 # ==================================================
 
 df_digesto_normas["texto_original_alternativo"] = (
-    df_digesto_normas["id_norma"].apply(reconstruir_url_infoleg)
+    df_digesto_normas["id_norma"].apply(lambda x: reconstruir_url_infoleg(x) if pd.notna(x) else pd.NA)
 )
 
-# NO rellenar url_texto_original
-# (si Infoleg no tiene texto real → queda NA a propósito)
-
-# Campo vacío para scraping bajo demanda
+# NO rellenamos url_texto_original
 df_digesto_normas["resumen_infoleg"] = pd.NA
 
 # ==================================================
-# Guardar digesto_normas.csv con QUOTE_ALL
-# (soluciona truncados y "faltantes fantasma" en Excel)
+# Guardar CSV con QUOTE_ALL para que Excel NO corte URLs
 # ==================================================
 
 df_digesto_normas.to_csv(
@@ -151,8 +149,6 @@ print("digesto_normas.csv generado correctamente.")
 # Crear digesto_relaciones
 # ==================================================
 
-print("Generando digesto_relaciones.csv...")
-
 df_rel_modifica = pd.DataFrame({
     "id_origen": df_modifatorias["id_norma_modificatoria"],
     "id_destino": df_modifatorias["id_norma_modificada"],
@@ -165,11 +161,7 @@ df_rel_modificada_por = pd.DataFrame({
     "tipo_relacion": "es_modificada_por"
 })
 
-df_digesto_rel = pd.concat(
-    [df_rel_modifica, df_rel_modificada_por],
-    ignore_index=True
-)
-
+df_digesto_rel = pd.concat([df_rel_modifica, df_rel_modificada_por], ignore_index=True)
 df_digesto_rel = reparar_mojibake_df(df_digesto_rel)
 
 df_digesto_rel.to_csv(
