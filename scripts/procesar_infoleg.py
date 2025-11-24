@@ -2,8 +2,6 @@
 
 import os
 import pandas as pd
-import requests
-from bs4 import BeautifulSoup
 
 # ==================================================
 # Rutas fijas para entorno de GitHub Actions
@@ -72,63 +70,18 @@ def leer_csv_reforzado(path: str) -> pd.DataFrame:
     df = reparar_mojibake_df(df)
     return df
 
+
 # ==================================================
-# Reconstrucción de URL y scraping de Resumen
+# Reconstrucción de URL alternativa para normas sin texto completo
 # ==================================================
 
 def reconstruir_url_infoleg(id_norma):
     """
-    Para normas sin texto original cargado en Infoleg,
-    la URL 'real' que existe es la ficha dinámica:
-    https://servicios.infoleg.gob.ar/infolegInternet/verNorma.do?id={id_norma}
+    Genera la URL dinámica a la ficha Infoleg,
+    usada cuando no existe texto_original real.
     """
     return f"https://servicios.infoleg.gob.ar/infolegInternet/verNorma.do?id={id_norma}"
 
-
-def obtener_resumen_infoleg(id_norma):
-    """
-    Scrapea la página verNorma.do?id={id_norma} y devuelve el Resumen.
-
-    Estructura HTML típica (ejemplo real que pasaste):
-
-    <p>
-      <strong> Resumen:</strong><br>
-      SE DECLARA PROCEDENTE ...
-    </p>
-
-    Estrategia:
-    - Buscar <strong> que contenga 'Resumen'
-    - Tomar el texto del <p> padre
-    - Quitar la etiqueta 'Resumen:'
-    """
-    url = reconstruir_url_infoleg(id_norma)
-
-    try:
-        r = requests.get(url, timeout=10)
-        if r.status_code != 200:
-            return None
-
-        # El HTML declara charset ISO-8859-1
-        r.encoding = "ISO-8859-1"
-        soup = BeautifulSoup(r.text, "html.parser")
-
-        # Buscar <strong> con la palabra 'Resumen'
-        strong = soup.find("strong", string=lambda s: s and "Resumen" in s)
-        if not strong:
-            return None
-
-        p_tag = strong.parent
-        if not p_tag:
-            return None
-
-        # Extraer texto del <p>, limpiando el "Resumen:"
-        texto = p_tag.get_text(separator=" ", strip=True)
-        texto = texto.replace("Resumen:", "").replace("RESUMEN:", "").strip()
-
-        return texto if texto else None
-
-    except Exception:
-        return None
 
 # ==================================================
 # Procesamiento principal
@@ -165,51 +118,9 @@ df_digesto_normas = pd.DataFrame({
 # Reparación final de mojibake
 df_digesto_normas = reparar_mojibake_df(df_digesto_normas)
 
-# Normalizar columna URL original (tratar vacío como faltante)
-df_digesto_normas["url_texto_original"] = (
-    df_digesto_normas["url_texto_original"]
-    .astype("string")
-    .replace({"": pd.NA})
-)
-
-# Identificar normas sin texto original cargado
-mask_sin_texto_original = df_digesto_normas["url_texto_original"].isna()
-
-# Reconstruir URL dinámica verNorma.do para esas normas
-df_digesto_normas.loc[mask_sin_texto_original, "url_texto_original"] = (
-    df_digesto_normas.loc[mask_sin_texto_original, "id_norma"]
-    .apply(reconstruir_url_infoleg)
-)
-
-# Crear columna para guardar el Resumen de Infoleg
-df_digesto_normas["resumen_infoleg"] = pd.NA
-
-# Scraping de resumen SOLO para normas sin texto original "real"
-print("Recuperando 'Resumen' de Infoleg para normas sin texto original completo...")
-
-indices_a_procesar = df_digesto_normas[mask_sin_texto_original].index
-
-for idx in indices_a_procesar:
-    id_norma = df_digesto_normas.at[idx, "id_norma"]
-    resumen = obtener_resumen_infoleg(id_norma)
-    df_digesto_normas.at[idx, "resumen_infoleg"] = resumen
-
-# Guardar archivo maestro
-df_digesto_normas.to_csv(
-    os.path.join(BASE_PROCESADA, "digesto_normas.csv"),
-    index=False,
-    encoding="utf-8-sig"
-)
-
-
-#  URL ALTERNATIVA - Paea cuando no existe texto_original
-
-def reconstruir_url_infoleg(id_norma):
-    """
-    Genera la URL dinámica a la ficha Infoleg,
-    usada cuando no existe texto_original real.
-    """
-    return f"https://servicios.infoleg.gob.ar/infolegInternet/verNorma.do?id={id_norma}"
+# ======================================================================
+# 2.b NORMALIZACIÓN: texto_original + texto_original_alternativo
+# ======================================================================
 
 # Normalizar valores vacíos como NA
 df_digesto_normas["url_texto_original"] = (
@@ -218,21 +129,26 @@ df_digesto_normas["url_texto_original"] = (
     .replace({"": pd.NA})
 )
 
-# Crear campo alternativo siempre presente
+# Crear campo alternativo SIEMPRE
 df_digesto_normas["texto_original_alternativo"] = (
     df_digesto_normas["id_norma"].apply(reconstruir_url_infoleg)
 )
 
-# Cuando NO existe texto_original → usar el alternativo como principal
+# Si falta texto_original real, usar la alternativa
 mask_sin_texto = df_digesto_normas["url_texto_original"].isna()
-
 df_digesto_normas.loc[mask_sin_texto, "url_texto_original"] = (
     df_digesto_normas.loc[mask_sin_texto, "texto_original_alternativo"]
 )
 
-# Campo para scraper bajo demanda
+# Campo para scraping bajo demanda
 df_digesto_normas["resumen_infoleg"] = pd.NA
 
+# Guardar archivo maestro
+df_digesto_normas.to_csv(
+    os.path.join(BASE_PROCESADA, "digesto_normas.csv"),
+    index=False,
+    encoding="utf-8-sig"
+)
 
 print("digesto_normas.csv generado correctamente.")
 
