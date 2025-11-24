@@ -140,7 +140,8 @@ df_digesto_normas.to_csv(
     os.path.join(BASE_PROCESADA, "digesto_normas.csv"),
     index=False,
     encoding="utf-8-sig",
-    quoting=csv.QUOTE_ALL
+    quoting=csv.QUOTE_ALL,
+    escapechar="\\"
 )
 
 print("digesto_normas.csv generado correctamente.")
