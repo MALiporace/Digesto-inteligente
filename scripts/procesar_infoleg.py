@@ -91,6 +91,31 @@ df_digesto_normas = pd.DataFrame({
 df_digesto_normas = reparar_mojibake_df(df_digesto_normas)
 
 # ==================================================
+# Agregar columnas de integración con el scraper
+# ==================================================
+
+def construir_url_ficha(id_norma):
+    return f"https://servicios.infoleg.gob.ar/infolegInternet/verNorma.do?id={id_norma}"
+
+# URL dinámica SIEMPRE presente
+df_digesto_normas["url_infoleg_ficha"] = df_digesto_normas["id_norma"].astype(str).apply(construir_url_ficha)
+
+# paths lógicos en Dropbox
+df_digesto_normas["path_ficha_html"] = df_digesto_normas["id_norma"].apply(lambda x: f"/fichas_html/{x}.html")
+df_digesto_normas["path_ficha_json"] = df_digesto_normas["id_norma"].apply(lambda x: f"/fichas_json/{x}.json")
+
+# indicadores (FALSE hasta que descarguemos algo)
+df_digesto_normas["ficha_descargada"] = False
+df_digesto_normas["ficha_parseada"] = False
+
+# info auxiliar
+df_digesto_normas["tiene_texto_original"] = df_digesto_normas["url_texto_original"].notna()
+df_digesto_normas["tiene_resumen"] = df_digesto_normas["titulo_sumario"].notna()
+
+
+
+
+# ==================================================
 # NORMALIZACIÓN DE id_norma (CLAVE)
 # ==================================================
 # Elimina ".0", convierte todo a string, quita espacios, elimina NaN
