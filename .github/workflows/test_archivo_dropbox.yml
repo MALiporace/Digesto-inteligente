@@ -1,0 +1,41 @@
+name: Comprobar archivo en Dropbox
+
+on:
+  workflow_dispatch:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    env:
+      APP_KEY: ${{ secrets.APP_KEY }}
+      APP_SECRET: ${{ secrets.APP_SECRET }}
+      REFRESH_TOKEN: ${{ secrets.REFRESH_TOKEN }}
+    steps:
+      - name: Check digesto_relaciones.csv metadata
+        run: |
+          python - << 'EOF'
+          import os, json, requests
+
+          token_url = "https://api.dropbox.com/oauth2/token"
+          data = {
+              "grant_type": "refresh_token",
+              "refresh_token": os.environ["REFRESH_TOKEN"],
+              "client_id": os.environ["APP_KEY"],
+              "client_secret": os.environ["APP_SECRET"]
+          }
+          r = requests.post(token_url, data=data)
+          access = r.json()["access_token"]
+
+          headers = {
+              "Authorization": f"Bearer {access}",
+              "Content-Type": "application/json"
+          }
+
+          resp = requests.post(
+              "https://api.dropboxapi.com/2/files/get_metadata",
+              headers=headers,
+              json={"path": "/data_procesada/digesto_relaciones.csv"}
+          )
+
+          print(resp.json())
+          EOF
