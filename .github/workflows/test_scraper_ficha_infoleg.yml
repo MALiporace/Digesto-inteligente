@@ -32,7 +32,7 @@ jobs:
           import json
           from scripts.scraper_fichas_infoleg import obtener_ficha
 
-          norma_id = os.environ.get("INPUT_NORMA_ID")
+          norma_id = os.environ.get("INPUT_NORMA_ID", "").strip() or "283855"
 
           print("==============================================")
           print(f" Scrapeando norma ID = {norma_id}")
