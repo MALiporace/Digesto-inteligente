@@ -107,15 +107,32 @@ if __name__ == "__main__":
     with open("data_procesada/digesto_normas.csv", "rb") as f:
         dropbox_upload("/data_procesada/digesto_normas.csv", f.read())
 
-   # SUBIR también digesto_relaciones.csv
+   
+   # FORZAR delete + recreate de digesto_relaciones.csv
     rel_path = "data_procesada/digesto_relaciones.csv"
-    
+
+    # 1) Borrar remoto (si existe)
+    print("📌 Eliminando remoto: /data_procesada/digesto_relaciones.csv")
+    token = dropbox_get_access_token()
+
+    delete_headers = {
+        "Authorization": f"Bearer {token}",
+        "Content-Type": "application/json"
+    }
+
+    requests.post(
+        "https://api.dropboxapi.com/2/files/delete_v2",
+        headers=delete_headers,
+        json={"path": "/data_procesada/digesto_relaciones.csv"}
+    )
+
+    # 2) Volver a subir archivo nuevo
     if os.path.exists(rel_path):
-        print("📌 Subiendo digesto_relaciones.csv a Dropbox...")
+        print("📌 Subiendo nuevo digesto_relaciones.csv a Dropbox (delete + recreate)...")
         with open(rel_path, "rb") as f:
             dropbox_upload("/data_procesada/digesto_relaciones.csv", f.read())
     else:
-        print("Aviso: data_procesada/digesto_relaciones.csv no existe en este run.")
+        print("⚠️ Aviso: data_procesada/digesto_relaciones.csv no existe en el run.")
 
 
     print("✔ Sincronización de fichas completada.")
