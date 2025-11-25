@@ -18,21 +18,20 @@ jobs:
 
       - name: Instalar dependencias
         run: |
-          pip install pandas requests
+          pip install pandas requests beautifulsoup4
+
+      - name: Ejecutar descargar_infoleg.py
+        run: |
+          python scripts/descargar_infoleg.py
+
+      - name: Ejecutar procesar_infoleg.py
+        run: |
+          python scripts/procesar_infoleg.py
 
       - name: Ejecutar construcción de telaraña jurídica
         run: |
-          echo "=========================================="
-          echo " Iniciando construcción de telaraña"
-          echo "=========================================="
           python scripts/construir_telaraña.py
-          echo "=========================================="
-          echo " Telaraña construida correctamente"
-          echo "=========================================="
 
       - name: Mostrar archivo generado
         run: |
-          echo "=========================================="
-          echo " Vista previa de digesto_relaciones_expandido.csv"
-          echo "=========================================="
           head -n 50 data_procesada/digesto_relaciones_expandido.csv || true
