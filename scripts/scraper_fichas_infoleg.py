@@ -5,9 +5,10 @@ import json
 import time
 import requests
 from bs4 import BeautifulSoup
+import re
 
 # ============================================
-# CONFIG (USANDO TUS SECRETS)
+# CONFIG (CON TUS SECRETS)
 # ============================================
 
 DROPBOX_CLIENT_ID = os.environ.get("APP_KEY")
@@ -31,19 +32,17 @@ def dropbox_get_access_token():
         "client_id": DROPBOX_CLIENT_ID,
         "client_secret": DROPBOX_CLIENT_SECRET,
     }
-
     r = requests.post("https://api.dropbox.com/oauth2/token", data=data)
     r.raise_for_status()
     return r.json()["access_token"]
 
 
 # ============================================
-# SUBIR A DROPBOX
+# DROPBOX OPS
 # ============================================
 
 def dropbox_upload(path, content_bytes):
     token = dropbox_get_access_token()
-
     headers = {
         "Authorization": f"Bearer {token}",
         "Content-Type": "application/octet-stream",
@@ -53,61 +52,48 @@ def dropbox_upload(path, content_bytes):
             "autorename": False
         })
     }
-
     r = requests.post(
         "https://content.dropboxapi.com/2/files/upload",
         headers=headers,
         data=content_bytes
     )
-
     if r.status_code not in (200, 409):
         raise Exception(f"Error subiendo a Dropbox: {r.text}")
 
 
-# ============================================
-# DESCARGAR DESDE DROPBOX
-# ============================================
-
 def dropbox_download(path):
     token = dropbox_get_access_token()
-
     headers = {
         "Authorization": f"Bearer {token}",
         "Dropbox-API-Arg": json.dumps({"path": path})
     }
-
     r = requests.post(
         "https://content.dropboxapi.com/2/files/download",
         headers=headers
     )
-
     if r.status_code == 200:
         return r.content
-
     return None
 
 
 # ============================================
-# SCRAPE INFOLEG
+# SCRAP INFOLEG
 # ============================================
 
 def descargar_html_infoleg(id_norma):
     url = BASE_URL + str(id_norma)
-
-    for intento in range(3):
+    for _ in range(3):
         try:
             r = requests.get(url, timeout=10)
             if r.status_code == 200:
                 return r.text
         except:
-            pass
-        time.sleep(1.5)
-
+            time.sleep(1.5)
     return None
 
 
 # ============================================
-# PARSEOS
+# HELPERS
 # ============================================
 
 def clean(x):
@@ -115,6 +101,18 @@ def clean(x):
         return None
     return " ".join(x.split()).strip()
 
+
+def absolutizar_url(href):
+    if not href:
+        return None
+    if href.startswith("http"):
+        return href
+    return "https://servicios.infoleg.gob.ar/infolegInternet/" + href.lstrip("/")
+
+
+# ============================================
+# EXTRAER RELACIONES
+# ============================================
 
 def extraer_relaciones(soup):
     relaciones = {
@@ -130,7 +128,7 @@ def extraer_relaciones(soup):
 
     for p in soup.find_all("p"):
         txt = p.get_text(" ", strip=True).lower()
-        links = [(a.get_text(strip=True), a.get("href"))
+        links = [(a.get_text(strip=True), absolutizar_url(a.get("href")))
                  for a in p.find_all("a")]
 
         if "modifica a" in txt:
@@ -153,9 +151,70 @@ def extraer_relaciones(soup):
     return relaciones
 
 
+# ============================================
+# PARSEO PROFUNDO
+# ============================================
+
+def parsear_profundo(soup):
+    deep = {}
+
+    # 1) Texto completo de la ficha
+    textos = []
+    for p in soup.find_all("p"):
+        t = clean(p.get_text(" ", strip=True))
+        if t:
+            textos.append(t)
+    deep["texto_completo_ficha"] = "\n".join(textos)
+
+    # 2) Referencias embebidas a normas (detectando id=xxxxx)
+    refs = set()
+    for a in soup.find_all("a"):
+        href = a.get("href") or ""
+        if "id=" in href:
+            m = re.search(r"id=(\d+)", href)
+            if m:
+                refs.add(m.group(1))
+    deep["normas_mencionadas"] = sorted(list(refs))
+
+    # 3) Anexos detallados
+    anexos = []
+    for a in soup.find_all("a"):
+        href = a.get("href") or ""
+        if any(x in href for x in ["anexos", "adjunto", "adjuntos"]):
+            anexos.append({
+                "texto": clean(a.get_text()),
+                "url": absolutizar_url(href)
+            })
+    deep["anexos_detallados"] = anexos
+
+    # 4) Observaciones
+    obs = []
+    for strong in soup.find_all("strong"):
+        if "observ" in strong.get_text(strip=True).lower():
+            nxt = strong.find_next("p")
+            if nxt:
+                obs.append(clean(nxt.get_text()))
+    deep["observaciones"] = obs
+
+    # 5) Marco Jurídico y secciones similares
+    info = []
+    for t in soup.find_all(["h2", "h3", "strong"]):
+        txt = t.get_text(strip=True).lower()
+        if any(k in txt for k in ["marco", "base", "fundamento"]):
+            p = t.find_next("p")
+            if p:
+                info.append(clean(p.get_text()))
+    deep["marco_juridico"] = info
+
+    return deep
+
+
+# ============================================
+# PARSEO GENERAL DE FICHA
+# ============================================
+
 def parsear_html(id_norma, html):
     soup = BeautifulSoup(html, "html.parser")
-
     box = soup.find("div", {"id": "Textos_Completos"})
     if not box:
         return None
@@ -178,17 +237,19 @@ def parsear_html(id_norma, html):
     fecha_bo = None
     nro_bo = None
     for a in box.find_all("a"):
-        href = a.get("href") or ""
-        if "page_id=216" in href:
+        if "page_id=216" in (a.get("href") or ""):
             fecha_bo = clean(a.get_text())
             nro_bo = fecha_bo
 
-    anexos = []
+    anexos_basicos = []
     for a in soup.find_all("a"):
-        if a.get("href") and ("anexos" in a.get("href") or "adjuntos" in a.get("href")):
-            anexos.append(a.get("href"))
+        if a.get("href") and ("anexos" in a.get("href") or "adjunto" in a.get("href")):
+            anexos_basicos.append(absolutizar_url(a.get("href")))
 
     relaciones = extraer_relaciones(soup)
+
+    # PARSEO PROFUNDO
+    deep = parsear_profundo(soup)
 
     return {
         "id_norma": str(id_norma),
@@ -201,7 +262,8 @@ def parsear_html(id_norma, html):
             "numero": nro_bo
         },
         "relaciones": relaciones,
-        "anexos": anexos
+        "anexos": anexos_basicos,
+        "deep": deep
     }
 
 
@@ -249,5 +311,5 @@ def obtener_ficha(id_norma):
 # ============================================
 
 if __name__ == "__main__":
-    print(obtener_ficha(283855))
+    print(json.dumps(obtener_ficha(283855), indent=2, ensure_ascii=False))
 
