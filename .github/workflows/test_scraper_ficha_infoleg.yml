@@ -1,0 +1,22 @@
+name: Test Scraper Infoleg
+
+on:
+  workflow_dispatch:
+    inputs:
+      norma_id:
+        description: "ID de norma a scrapear"
+        required: true
+        default: "283855"
+
+jobs:
+  probar-scraper:
+    runs-on: ubuntu-latest
+
+    env:
+      APP_KEY: ${{ secrets.APP_KEY }}
+      APP_SECRET: ${{ secrets.APP_SECRET }}
+      REFRESH_TOKEN: ${{ secrets.REFRESH_TOKEN }}
+
+    steps:
+      - name: Checkout del repositorio
+        uses: actions/checkout@v4
