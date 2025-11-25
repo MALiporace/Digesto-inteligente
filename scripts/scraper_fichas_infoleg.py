@@ -187,14 +187,19 @@ def parsear_profundo(soup):
             })
     deep["anexos_detallados"] = anexos
 
-    # 4) Observaciones
+    # 4) Observaciones (filtrado fino)
     obs = []
     for strong in soup.find_all("strong"):
-        if "observ" in strong.get_text(strip=True).lower():
+        st = strong.get_text(strip=True).lower()
+        if "observ" in st:
             nxt = strong.find_next("p")
             if nxt:
-                obs.append(clean(nxt.get_text()))
-    deep["observaciones"] = obs
+                txt = clean(nxt.get_text())
+                if txt and txt.lower() != "texto completo de la norma":
+                    obs.append(txt)
+
+    # quitar duplicados
+    deep["observaciones"] = list(dict.fromkeys(obs))
 
     # 5) Marco Jurídico y secciones similares
     info = []
@@ -205,6 +210,19 @@ def parsear_profundo(soup):
             if p:
                 info.append(clean(p.get_text()))
     deep["marco_juridico"] = info
+
+    # 6) Relaciones embebidas por TEXTO (Ley 1234, Decreto 45/2020, etc.)
+    texto_total = deep.get("texto_completo_ficha", "")
+    menciones_texto = set()
+    
+    # patrones típicos argentinos
+    patron = r"\b(ley|decreto|resoluci[oó]n|disposici[oó]n)\s+(\d+(?:/\d+)?)\b"
+    
+    for tipo, numero in re.findall(patron, texto_total.lower()):
+        menciones_texto.add(f"{tipo.title()} {numero.upper()}")
+    
+    deep["normas_mencionadas_texto"] = sorted(list(menciones_texto))
+
 
     return deep
 
@@ -250,6 +268,26 @@ def parsear_html(id_norma, html):
 
     # PARSEO PROFUNDO
     deep = parsear_profundo(soup)
+
+    # DETECCIÓN DE TIPO Y NÚMERO DE NORMA (profundo)
+    tipo_norma_profundo = None
+    numero_norma_profundo = None
+    
+    if titulo:
+        # ejemplos:
+        # "Resolución 417/1991 SECRETARIA..."
+        # "Ley 1173 HONORABLE..."
+        # "Decreto 123/2020 PODER..."
+        # "Disposición 45/2018..."
+        m = re.match(r"^(ley|decreto|resolución|disposición|decisión administrativa|acordada|resolucion)\s+([0-9/. -]+)", 
+                     titulo.lower())
+        if m:
+            tipo_norma_profundo = m.group(1).title()
+            numero_norma_profundo = m.group(2).strip().upper()
+    
+    # Guardar en deep
+    deep["tipo_norma_profundo"] = tipo_norma_profundo
+    deep["numero_norma_profundo"] = numero_norma_profundo
 
     return {
         "id_norma": str(id_norma),
