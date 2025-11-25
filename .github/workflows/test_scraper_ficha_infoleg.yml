@@ -30,7 +30,7 @@ jobs:
           python - <<EOF
           import os
           import json
-          from scripts.scraper_fichas_dropbox import obtener_ficha
+          from scripts.scraper_fichas_infoleg import obtener_ficha
 
           norma_id = os.environ.get("INPUT_NORMA_ID")
 
