@@ -103,8 +103,16 @@ if __name__ == "__main__":
     print("📌 Guardando CSV actualizado localmente...")
     df.to_csv("data_procesada/digesto_normas.csv", index=False, encoding="utf-8")
 
-    print("📌 Subiendo CSV actualizado a Dropbox...")
+    print("📌 Subiendo digesto_normas.csv a Dropbox...")
     with open("data_procesada/digesto_normas.csv", "rb") as f:
         dropbox_upload("/data_procesada/digesto_normas.csv", f.read())
+
+    rel_path = "data_procesada/digesto_relaciones.csv"
+    if os.path.exists(rel_path):
+        print("📌 Subiendo digesto_relaciones.csv a Dropbox...")
+        with open(rel_path, "rb") as f:
+            dropbox_upload("/data_procesada/digesto_relaciones.csv", f.read())
+    else:
+        print("⚠️ Aviso: data_procesada/digesto_relaciones.csv no existe en este run.")
 
     print("✔ Sincronización de fichas completada.")
