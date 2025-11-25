@@ -27,7 +27,7 @@ jobs:
 
       - name: Ejecutar scraper
         run: |
-          python - << 'EOF'
+          python - <<EOF
           import os
           import json
           from scripts.scraper_fichas_dropbox import obtener_ficha
