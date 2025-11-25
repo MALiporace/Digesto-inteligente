@@ -4,6 +4,7 @@ import os
 import json
 import requests
 import pandas as pd
+import csv
 
 # ============================================
 # CONFIG (USANDO TUS SECRETS)
@@ -137,7 +138,13 @@ if __name__ == "__main__":
     df["ficha_parseada"] = df["id_norma"].apply(lambda x: x in ids_json)
 
     print("📌 Guardando CSV actualizado localmente...")
-    df.to_csv("data_procesada/digesto_normas.csv", index=False, encoding="utf-8")
+    df.to_csv(
+        "data_procesada/digesto_normas.csv",
+        index=False,
+        encoding="utf-8-sig",
+        quoting=csv.QUOTE_ALL,
+        escapechar="\\"
+    )
 
     print("📌 Subiendo digesto_normas.csv a Dropbox...")
     with open("data_procesada/digesto_normas.csv", "rb") as f:
