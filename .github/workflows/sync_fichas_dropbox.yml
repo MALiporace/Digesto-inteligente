@@ -1,0 +1,27 @@
+name: Sync Fichas Infoleg
+
+on:
+  schedule:
+    - cron: "0 6 * * *"   # 03:00 Argentina (UTC-3)
+  workflow_dispatch:
+
+jobs:
+  sync-fichas:
+    runs-on: ubuntu-latest
+
+    env:
+      APP_KEY: ${{ secrets.APP_KEY }}
+      APP_SECRET: ${{ secrets.APP_SECRET }}
+      REFRESH_TOKEN: ${{ secrets.REFRESH_TOKEN }}
+
+    steps:
+      - name: Checkout del repositorio
+        uses: actions/checkout@v4
+
+      - name: Instalar dependencias
+        run: |
+          pip install pandas requests
+
+      - name: Ejecutar sincronización
+        run: |
+          python scripts/sync_fichas_dropbox.py
