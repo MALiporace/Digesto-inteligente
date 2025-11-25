@@ -20,3 +20,29 @@ jobs:
     steps:
       - name: Checkout del repositorio
         uses: actions/checkout@v4
+
+      - name: Instalar dependencias
+        run: |
+          pip install requests beautifulsoup4
+
+      - name: Ejecutar scraper
+        run: |
+          python - << 'EOF'
+          import os
+          import json
+          from scripts.scraper_fichas_dropbox import obtener_ficha
+
+          norma_id = os.environ.get("INPUT_NORMA_ID")
+
+          print("==============================================")
+          print(f" Scrapeando norma ID = {norma_id}")
+          print("==============================================")
+
+          data = obtener_ficha(norma_id)
+
+          if data is None:
+              print("❌ No se pudo obtener la ficha.")
+          else:
+              print("✔ Ficha obtenida correctamente:")
+              print(json.dumps(data, indent=2, ensure_ascii=False))
+          EOF
