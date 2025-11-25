@@ -22,57 +22,22 @@ jobs:
         run: |
           pip install pandas requests beautifulsoup4
 
-      # ------------------------------
-      # 1) Descargar Infoleg
-      # ------------------------------
+      # ----------------------------------------------------------
+      # 1) Descargar Infoleg (CSV crudos)
+      # ----------------------------------------------------------
       - name: 1) Descargar Infoleg
         run: python scripts/descargar_infoleg.py
 
-      # ------------------------------
-      # 2) Procesar Infoleg
-      # ------------------------------
+      # ----------------------------------------------------------
+      # 2) Procesar Infoleg (genera digesto_normas + digesto_relaciones)
+      # ----------------------------------------------------------
       - name: 2) Procesar Infoleg
         run: python scripts/procesar_infoleg.py
 
-      # ------------------------------
-      # 3) Sincronizar fichas existentes
-      # ------------------------------
-      - name: 3) Sync fichas (actualiza columnas)
-        run: python scripts/sync_fichas_dropbox.py
-
-      # ------------------------------
-      # 4) Descargar y parsear fichas que faltan
-      #    Límite diario: 2000 normas para evitar rate limits
-      # ------------------------------
-      - name: 4) Procesar nuevas fichas
-        run: |
-          python - << 'EOF'
-          import pandas as pd
-          from scripts.scraper_fichas_infoleg import obtener_ficha
-
-          df = pd.read_csv("data_procesada/digesto_normas.csv", dtype=str)
-
-          faltan = df[df["ficha_parseada"] == "False"]["id_norma"].tolist()
-          faltan = faltan[:10]  # límite diario
-
-          print(f"Procesando {len(faltan)} fichas nuevas...")
-
-          for i, norma in enumerate(faltan, 1):
-              print(f"{i}/{len(faltan)}: {norma}")
-              obtener_ficha(norma)
-          EOF
-
-      # ------------------------------
-      # 5) Re-sincronizar columnas de fichas
-      # ------------------------------
-      - name: 5) Re-sync fichas
-        run: python scripts/sync_fichas_dropbox.py
-
-      # ------------------------------
-      # 6) Subir digesto_relaciones.csv a dropbox
-      # ------------------------------
-
-      - name: Subir digesto_relaciones.csv a Dropbox
+      # ----------------------------------------------------------
+      # 3) Subir digesto_normas.csv y digesto_relaciones.csv
+      # ----------------------------------------------------------
+      - name: 3) Subir digesto_normas.csv + digesto_relaciones.csv a Dropbox
         run: |
           python - << 'EOF'
           import os, json, requests
@@ -94,28 +59,68 @@ jobs:
           r = requests.post(token_url, data=data)
           access = r.json()["access_token"]
 
-          headers = {
-              "Authorization": f"Bearer {access}",
-              "Content-Type": "application/octet-stream",
-              "Dropbox-API-Arg": json.dumps({
-                  "path": "/data_procesada/digesto_relaciones.csv",
-                  "mode": "overwrite",
-                  "autorename": False
-              })
-          }
+          def subir(local, remoto):
+              headers = {
+                  "Authorization": f"Bearer {access}",
+                  "Content-Type": "application/octet-stream",
+                  "Dropbox-API-Arg": json.dumps({
+                      "path": remoto,
+                      "mode": "overwrite",
+                      "autorename": False
+                  })
+              }
+              with open(local, "rb") as f:
+                  requests.post(upload_url, headers=headers, data=f.read())
 
-          with open("data_procesada/digesto_relaciones.csv", "rb") as f:
-              requests.post(upload_url, headers=headers, data=f.read())
+          # subir digesto_normas
+          subir("data_procesada/digesto_normas.csv",
+                "/data_procesada/digesto_normas.csv")
+
+          # subir digesto_relaciones
+          subir("data_procesada/digesto_relaciones.csv",
+                "/data_procesada/digesto_relaciones.csv")
 
           EOF
 
-        
+      # ----------------------------------------------------------
+      # 4) Sincronizar fichas (marca cuáles ya existen en Dropbox)
+      # ----------------------------------------------------------
+      - name: 4) Sync fichas (actualiza columnas)
+        run: python scripts/sync_fichas_dropbox.py
 
-      # ------------------------------
-      # 7) Construir telaraña
-      # ------------------------------
+      # ----------------------------------------------------------
+      # 5) Descargar y parsear fichas nuevas
+      # ----------------------------------------------------------
+      - name: 5) Procesar nuevas fichas (límite diario)
+        run: |
+          python - << 'EOF'
+          import pandas as pd
+          from scripts.scraper_fichas_dropbox import obtener_ficha
+
+          df = pd.read_csv("data_procesada/digesto_normas.csv", dtype=str)
+
+          faltan = df[df["ficha_parseada"] == "False"]["id_norma"].tolist()
+          faltan = faltan[:2000]  # límite diario recomendado
+
+          print(f"Procesando {len(faltan)} fichas nuevas...")
+
+          for i, norma in enumerate(faltan, 1):
+              print(f"{i}/{len(faltan)}: {norma}")
+              obtener_ficha(norma)
+          EOF
+
+      # ----------------------------------------------------------
+      # 6) Re-sync fichas (marcar como descargadas/parseadas)
+      # ----------------------------------------------------------
+      - name: 6) Re-sync fichas
+        run: python scripts/sync_fichas_dropbox.py
+
+      # ----------------------------------------------------------
+      # 7) Construir telaraña jurídica expandida
+      # ----------------------------------------------------------
       - name: 7) Construir telaraña jurídica
         run: python scripts/construir_telaraña.py
 
       - name: FIN
         run: echo "Pipeline completo generado correctamente."
+
