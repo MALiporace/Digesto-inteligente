@@ -1,0 +1,38 @@
+name: Probar Construcción Telaraña Jurídica
+
+on:
+  workflow_dispatch:
+
+jobs:
+  test-telarana:
+    runs-on: ubuntu-latest
+
+    env:
+      APP_KEY: ${{ secrets.APP_KEY }}
+      APP_SECRET: ${{ secrets.APP_SECRET }}
+      REFRESH_TOKEN: ${{ secrets.REFRESH_TOKEN }}
+
+    steps:
+      - name: Checkout del repositorio
+        uses: actions/checkout@v4
+
+      - name: Instalar dependencias
+        run: |
+          pip install pandas requests
+
+      - name: Ejecutar construcción de telaraña jurídica
+        run: |
+          echo "=========================================="
+          echo " Iniciando construcción de telaraña"
+          echo "=========================================="
+          python scripts/construir_telaraña.py
+          echo "=========================================="
+          echo " Telaraña construida correctamente"
+          echo "=========================================="
+
+      - name: Mostrar archivo generado
+        run: |
+          echo "=========================================="
+          echo " Vista previa de digesto_relaciones_expandido.csv"
+          echo "=========================================="
+          head -n 50 data_procesada/digesto_relaciones_expandido.csv || true
