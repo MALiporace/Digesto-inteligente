@@ -107,20 +107,15 @@ if __name__ == "__main__":
     with open("data_procesada/digesto_normas.csv", "rb") as f:
         dropbox_upload("/data_procesada/digesto_normas.csv", f.read())
 
+   # SUBIR también digesto_relaciones.csv
     rel_path = "data_procesada/digesto_relaciones.csv"
-    if os.path.exists(rel_path):
-        print("📌 Subiendo digesto_relaciones.csv a Dropbox...")
-        with open(rel_path, "rb") as f:
-            dropbox_upload("/data_procesada/digesto_relaciones.csv", f.read())
-    else:
-        print("No existe digesto_relaciones.csv en este run.")
-
-    rel_path = "data_procesada/digesto_relaciones.csv"
+    
     if os.path.exists(rel_path):
         print("📌 Subiendo digesto_relaciones.csv a Dropbox...")
         with open(rel_path, "rb") as f:
             dropbox_upload("/data_procesada/digesto_relaciones.csv", f.read())
     else:
         print("Aviso: data_procesada/digesto_relaciones.csv no existe en este run.")
+
 
     print("✔ Sincronización de fichas completada.")
