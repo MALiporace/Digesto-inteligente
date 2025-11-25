@@ -1,0 +1,78 @@
+name: Digesto Inteligente – Pipeline Completo
+
+on:
+  schedule:
+    - cron: "0 3 * * *"   # todos los días a las 00:00 Argentina
+  workflow_dispatch:
+
+jobs:
+  digesto-master:
+    runs-on: ubuntu-latest
+
+    env:
+      APP_KEY: ${{ secrets.APP_KEY }}
+      APP_SECRET: ${{ secrets.APP_SECRET }}
+      REFRESH_TOKEN: ${{ secrets.REFRESH_TOKEN }}
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Instalar dependencias
+        run: |
+          pip install pandas requests beautifulsoup4
+
+      # ------------------------------
+      # 1) Descargar Infoleg
+      # ------------------------------
+      - name: 1) Descargar Infoleg
+        run: python scripts/descargar_infoleg.py
+
+      # ------------------------------
+      # 2) Procesar Infoleg
+      # ------------------------------
+      - name: 2) Procesar Infoleg
+        run: python scripts/procesar_infoleg.py
+
+      # ------------------------------
+      # 3) Sincronizar fichas existentes
+      # ------------------------------
+      - name: 3) Sync fichas (actualiza columnas)
+        run: python scripts/sync_fichas_dropbox.py
+
+      # ------------------------------
+      # 4) Descargar y parsear fichas que faltan
+      #    Límite diario: 2000 normas para evitar rate limits
+      # ------------------------------
+      - name: 4) Procesar nuevas fichas
+        run: |
+          python - << 'EOF'
+          import pandas as pd
+          from scripts.scraper_fichas_dropbox import obtener_ficha
+
+          df = pd.read_csv("data_procesada/digesto_normas.csv", dtype=str)
+
+          faltan = df[df["ficha_parseada"] == "False"]["id_norma"].tolist()
+          faltan = faltan[:2000]  # límite diario
+
+          print(f"Procesando {len(faltan)} fichas nuevas...")
+
+          for i, norma in enumerate(faltan, 1):
+              print(f"{i}/{len(faltan)}: {norma}")
+              obtener_ficha(norma)
+          EOF
+
+      # ------------------------------
+      # 5) Re-sincronizar columnas de fichas
+      # ------------------------------
+      - name: 5) Re-sync fichas
+        run: python scripts/sync_fichas_dropbox.py
+
+      # ------------------------------
+      # 6) Construir telaraña
+      # ------------------------------
+      - name: 6) Construir telaraña jurídica
+        run: python scripts/construir_telaraña.py
+
+      - name: FIN
+        run: echo "Pipeline completo generado correctamente."
