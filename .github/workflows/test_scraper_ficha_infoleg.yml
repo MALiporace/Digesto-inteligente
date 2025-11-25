@@ -40,6 +40,11 @@ jobs:
 
           data = obtener_ficha(norma_id)
 
+          print("===================================")
+          print("JSON COMPLETO (incluido deep):")
+          print("===================================")
+          print(json.dumps(data, indent=2, ensure_ascii=False))
+
           if data is None:
               print("❌ No se pudo obtener la ficha.")
           else:
