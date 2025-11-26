@@ -1,0 +1,25 @@
+name: Contar JSON
+on: workflow_dispatch
+
+jobs:
+  count:
+    runs-on: ubuntu-latest
+    env:
+      APP_KEY: ${{ secrets.APP_KEY }}
+      APP_SECRET: ${{ secrets.APP_SECRET }}
+      REFRESH_TOKEN: ${{ secrets.REFRESH_TOKEN }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Instalar dependencias
+        run: pip install requests pandas
+
+      - name: Contar JSON
+        run: |
+          python - << 'EOF'
+          from scripts.sync_fichas_dropbox import dropbox_list_folder
+          archivos = dropbox_list_folder("/fichas_json")
+          print("Total JSON:", len(archivos))
+          EOF
