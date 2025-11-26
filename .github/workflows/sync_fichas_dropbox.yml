@@ -1,9 +1,9 @@
 name: Sync Fichas Infoleg
 
 on:
-  schedule:
-    - cron: "0 6 * * *"   # 03:00 Argentina (UTC-3)
-  workflow_dispatch:
+  #schedule:
+  #  - cron: "0 6 * * *"   # 03:00 Argentina (UTC-3)
+  #workflow_dispatch:
 
 jobs:
   sync-fichas:
