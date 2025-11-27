@@ -100,7 +100,7 @@ jobs:
           df = pd.read_csv("data_procesada/digesto_normas.csv", dtype=str)
 
           faltan = df[df["ficha_parseada"] == "False"]["id_norma"].tolist()
-          faltan = faltan[:2000]  # límite diario recomendado
+          faltan = faltan[:50]  # límite diario recomendado
 
           print(f"Procesando {len(faltan)} fichas nuevas...")
 
